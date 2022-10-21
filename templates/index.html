@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+      <meta charset="UTF-8">
+      <title>Test</title>
+      <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css">
+      <script src="https://code.jquery.com/jquery-3.3.1.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.3/socket.io.js"></script>
+      <script type="text/javascript">
+         var socket;
+         $(document).ready(function() {
+         
+           // sending a connect request to the server.
+           socket = io.connect();
+
+           socket.emit('create_room', {
+                   name: 'sunnyguan'
+            });
+         
+           socket.on('current_room_number', function(rooms) {
+               console.log('After creating a room: ', rooms);
+           });
+
+           socket.on('current_players', function(player) {
+               console.log('After creating a room, users in this room: ', player);
+           });
+
+           socket.emit('join_room','1',{
+                   name: 'nhingo'
+            });
+
+            socket.on('current_room_number', function(rooms) {
+               console.log('After joining a room: ', rooms);
+           });
+
+           socket.on('current_players', function(player) {
+               console.log('After joining a room, users in this room: ', player);
+           });
+
+         });
+
+         function leave_room() {
+            socket.emit('leave_room')
+
+            socket.on('current_room_number', function(rooms) {
+               console.log('After leaving a room: ', rooms);
+           });
+
+           socket.on('current_players', function(player) {
+               console.log('After leaving a room, users in this room: ', player);
+           });
+         }
+
+      </script>
+   </head>
+   <body>
+      <div class="container text-center">
+         <h1 >Test</h1>
+         <button onClick="leave_room()">Leave</button>
+      </div>
+   </body>
+</html>
