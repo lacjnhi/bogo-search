@@ -11,59 +11,48 @@
          $(document).ready(function() {
          
            // sending a connect request to the server.
-           socket = io.connect();
+         //   socket = io.connect();
 
-           socket.emit('create_room', {
-                   name: 'sunnyguan'
-            });
-           socket.on('current_room_number', function(room_id) {
-               console.log('After creating a room: ', room_id);
-           });
-           socket.on('current_players', function(player) {
-               console.log('After creating a room, users in this room: ', player);
-           });
+         //   socket.emit('create_room', {
+         //           name: 'sunnyguan',
+         //           room_name: '1'
+         //    });
 
-           socket.emit('join_room', {
-                   name: 'nhingo',
-                   room_id: '1'
-            });
-            socket.on('current_room_number', function(room_id) {
-               console.log('After joining a room: ', room_id);
-           });
-           socket.on('current_players', function(player) {
-               console.log('After joining a room, users in this room: ', player);
-           });
+         //   socket.emit('join_room', {
+         //           name: 'nhingo',
+         //           room_id: '1'
+         //    });
 
-           socket.emit('message',{message: 'Hello'});
-           socket.on('get_message', function(msg) {
-            console.log(msg)
-           });
+         //   socket.emit('message',{message: 'Hello'});
+         //   socket.on('message', function(msg) {
+         //    console.log(msg)
+         //   });
 
-           socket.emit('submission',
-           {
-            "status_code": 20,
-            "lang": "cpp",
-            "run_success": false,
-            "compile_error": "Line 16: Char 5: error: non-void function does not return a value [-Werror,-Wreturn-type]",
-            "full_compile_error": "Line 16: Char 5: error: non-void function does not return a value [-Werror,-Wreturn-type]\n    }\n    ^\n1 error generated.",
-            "status_runtime": "N/A",
-            "memory": 0,
-            "question_id": "1029",
-            "task_finish_time": 1666473810754,
-            "elapsed_time": 0,
-            "total_correct": null,
-            "total_testcases": null,
-            "runtime_percentile": null,
-            "status_memory": "N/A",
-            "memory_percentile": null,
-            "pretty_lang": "C++",
-            "submission_id": "828161291",
-            "status_msg": "Compile Error",
-            "state": "SUCCESS"
-           });
-           socket.on('submission', function(msg) {
-            console.log(msg)
-           });
+         //   socket.emit('submission',
+         //   {
+         //    "status_code": 20,
+         //    "lang": "cpp",
+         //    "run_success": false,
+         //    "compile_error": "Line 16: Char 5: error: non-void function does not return a value [-Werror,-Wreturn-type]",
+         //    "full_compile_error": "Line 16: Char 5: error: non-void function does not return a value [-Werror,-Wreturn-type]\n    }\n    ^\n1 error generated.",
+         //    "status_runtime": "N/A",
+         //    "memory": 0,
+         //    "question_id": "1029",
+         //    "task_finish_time": 1666473810754,
+         //    "elapsed_time": 0,
+         //    "total_correct": null,
+         //    "total_testcases": null,
+         //    "runtime_percentile": null,
+         //    "status_memory": "N/A",
+         //    "memory_percentile": null,
+         //    "pretty_lang": "C++",
+         //    "submission_id": "828161291",
+         //    "status_msg": "Compile Error",
+         //    "state": "SUCCESS"
+         //   });
+         //   socket.on('submission', function(msg) {
+         //    console.log(msg)
+         //   });
 
          });
 
