@@ -22,22 +22,28 @@ room_name_pairs2 = defaultdict(str) # key: room name, value: room id
 chat_logs = defaultdict(list)       # key: room id, value: list of messages
 room_number = 0
 
+user_scores = defaultdict(lambda: defaultdict(int)) # key: room_id value: {key: user value: score} 
+
 LEETCODE_URL = "https://leetcode.com/api/problems/algorithms/"
 algorithms_problems_json = requests.get(LEETCODE_URL).content
 algorithms_problems_json = json.loads(algorithms_problems_json)["stat_status_pairs"]
 
 @socketio.on('create_room')
 def create_room(data):
+    print('sunny')
     global algorithms_problems_json
     # free and easy questions
-    algorithms_problems_json = [obj for obj in algorithms_problems_json if not obj['paid_only'] and obj['difficulty']['level'] == 1]
+    # algorithms_problems_json = [obj for obj in algorithms_problems_json if not obj['paid_only'] and obj['difficulty']['level'] == 1]
     # free questions
-    # algorithms_problems_json = [obj for obj in algorithms_problems_json if not obj['paid_only']]
-    number_of_questions = len(algorithms_problems_json)
+    algorithms_problems_json = [obj for obj in algorithms_problems_json if not obj['paid_only']]
+    easy_questions = [obj for obj in algorithms_problems_json if obj['difficulty']['level'] == 1]
+    med_questions = [obj for obj in algorithms_problems_json if obj['difficulty']['level'] == 2]
+    hard_questions = [obj for obj in algorithms_problems_json if obj['difficulty']['level'] == 3]
 
     # Add user in a room
     user_id = request.sid
     room_name = data['room_name']
+    easy, med, hard = data['difficulties']
 
     if room_name in room_name_pairs2:
         return
@@ -58,14 +64,33 @@ def create_room(data):
     current_users[user_id] = (room_id, data['name'])
 
     # Generate random 4 leetcode questions
-    list_of_question_numbers = [random.randint(0, number_of_questions) for _ in range(4)]
+    easy_question_numbers = [random.randint(0, len(easy_questions)) for _ in range(easy)]
+    med_question_numbers = [random.randint(0, len(med_questions)) for _ in range(med)]
+    hard_question_numbers = [random.randint(0, len(hard_questions)) for _ in range(hard)]
+
     list_of_question_links = []
     question_title = []
 
-    for question_id in list_of_question_numbers:
-        link = 'https://www.leetcode.com/problems/' + algorithms_problems_json[question_id]['stat']["question__title_slug"] + '/'
-        list_of_question_links.append(link)
-        question_title.append(algorithms_problems_json[question_id]['stat']["question__title"])
+    # generate easy questions
+    for question_id in easy_question_numbers:
+        link = 'https://www.leetcode.com/problems/' + easy_questions[question_id]['stat']["question__title_slug"] + '/'
+        difficulty = 1
+        list_of_question_links.append((link, difficulty))
+        question_title.append(easy_questions[question_id]['stat']["question__title"])
+
+    # generate med questions
+    for question_id in med_question_numbers:
+        link = 'https://www.leetcode.com/problems/' + med_questions[question_id]['stat']["question__title_slug"] + '/'
+        difficulty = 2
+        list_of_question_links.append((link, difficulty))
+        question_title.append(med_questions[question_id]['stat']["question__title"])
+
+    # generate hard questions
+    for question_id in hard_question_numbers:
+        link = 'https://www.leetcode.com/problems/' + hard_questions[question_id]['stat']["question__title_slug"] + '/'
+        difficulty = 3
+        list_of_question_links.append((link, difficulty))
+        question_title.append(hard_questions[question_id]['stat']["question__title"])
     
     # list_of_question_links = [
     #     'https://www.leetcode.com/problems/two-sum/',
@@ -73,14 +98,16 @@ def create_room(data):
     #     'https://www.leetcode.com/problems/contains-duplicate/',
     #     'https://www.leetcode.com/problems/product-of-array-except-self/'
     # ]
-    # question_title = ['two-sum', 'two sum', 'two Sum', 'Two sum']
+    # question_title = ['two sum blush', 'stonks', 'duplicate sadge', 'brain ded on easy question']
 
     # add question status
-    user_question_status[room_id][user_id] = []
+    user_question_status[room_id][data['name']] = []
+    user_scores[room_id][data['name']] = 0
 
     for i in range(4):
-        room_questions[room_id].append((question_title[i], list_of_question_links[i]))
-        user_question_status[room_id][user_id].append(0)
+        # (title, links, difficulty)
+        room_questions[room_id].append((question_title[i], list_of_question_links[i][0], list_of_question_links[i][1]))
+        user_question_status[room_id][data['name']].append(0)
 
     print(room_questions)
     print(user_question_status)
@@ -152,9 +179,11 @@ def join_room(data):
             print(rooms)
 
             # add question status
-            for i in range(4):
-                user_question_status[room_id][user_id].append(0)
-            print(user_question_status)
+            if user not in user_scores[room_id]:
+                user_scores[room_id][user] = 0
+                for _ in range(4):
+                    user_question_status[room_id][user].append(0)
+                print(user_question_status)
 
 @socketio.on('leave_room')
 def leave_room():
@@ -181,6 +210,8 @@ def leave_room():
         del room_name_pairs1[room_id]
         del room_name_pairs2[room_name]
         del user_question_status[room_id]
+        if room_id in user_scores:
+            del user_scores[room_id]
     else:
         room_name = room_name_pairs1[room_id]
         print("User " + user + " disconnected from " + str(room_id) + ". The users in the current room " +  str(room_id) + " are: ")
@@ -192,11 +223,14 @@ def leave_room():
         questions = room_questions[room_id]
         emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name}, room=room_id, include_self=False)
     
-    messaging({'message': user + ' just left the room!', 'type': 'admin'})
+    messaging({'message': user + ' just left the room!', 'type': 'admin', 'include_self': False})
 
     del current_users[user_id]
-    if room_id in user_question_status and user_id in user_question_status[room_id]:
-        del user_question_status[room_id][user_id]
+    # if room_id in user_question_status and user in user_question_status[room_id]:
+    #     del user_question_status[room_id][user]
+
+    # if room_id in user_scores and user in user_scores[room_id]:
+    #     del user_scores[room_id][user]
 
     socketio.server.leave_room(user_id, room_id)
 
@@ -206,6 +240,7 @@ def leave_room():
 def messaging(data):
     msg = data['message']
     msg_type = data['type'] if 'type' in data else 'chat'
+    include_self = data['include_self'] if 'include_self' in data else True
 
     print(msg)
     user_id = request.sid
@@ -219,10 +254,10 @@ def messaging(data):
         chat_logs[room_id].append(tmp)
 
         print('Received message from ' + user + ': ' + msg + ' in room ' + room_name)
-        emit('message', tmp, room=room_id)
+        emit('message', tmp, room=room_id, include_self=include_self)
 
 
-user_question_status = defaultdict(lambda: defaultdict(list)) # key: roomid value: {key: userid value: status 0/1/2}
+user_question_status = defaultdict(lambda: defaultdict(list)) # key: roomid value: {key: username value: status 0/1/2}
 # 0: not started
 # 1: started but unsuccessful
 # 2: successfully solved
@@ -230,8 +265,9 @@ user_question_status = defaultdict(lambda: defaultdict(list)) # key: roomid valu
 @socketio.on('submission')
 def send_submission(data):
     user_id = request.sid
-    submission_status = data['run_success']
+    submission_status = data['status_msg']
     id = data['curr_id']
+    difficulty = data['difficulty']
 
     msg = ''
 
@@ -239,31 +275,45 @@ def send_submission(data):
         user = current_users[user_id][1]
         room_id = current_users[user_id][0]
 
-        if not submission_status:
+        if submission_status != 'Accepted':
             msg = current_users[user_id][1] + ' submitted question ' + str(id+1) + '!'
 
             # set status to 1: started but unsuccessful
-            user_question_status[room_id][user_id][id] = 1
+            user_question_status[room_id][user][id] = 1
             messaging({'message': msg, 'type': 'submission'})
-        else:
+        elif user_question_status[room_id][user][id] != 2:
             percentile = data['runtime_percentile']
             language = data['pretty_lang']
 
             # set status to 2: successfully solved
-            user_question_status[room_id][user_id][id] = 2
+            user_question_status[room_id][user][id] = 2
 
             msg = user + ' completed the problem ' + str(id+1) + ' in ' + language + ', beat ' + str(percentile) + '% of users!'
             messaging({'message': msg, 'type': 'submission'})
+            user_scores[room_id][user] += difficulty
 
             # user successfully solved every problems
-            if len(set(user_question_status[room_id][user_id])) == 1 and list(set(user_question_status[room_id][user_id]))[0] == 2:
+            if len(set(user_question_status[room_id][user])) == 1 and list(set(user_question_status[room_id][user]))[0] == 2:
                 msg = user + ' finished the contest!'
                 messaging({'message': msg, 'type': 'submission'})
-        
-                                          
+
 @socketio.on('leaderboard')
-def get_rankings(data):
-    order = []
-    
+def get_rankings():
+    # return users, their question statuses and rankings
+    user_id = request.sid 
+    if user_id in current_users:
+        room_id = current_users[user_id][0]
+
+        rankings = user_scores[room_id]
+        rankings = sorted(rankings.items(), key=lambda i: i[1], reverse=True)
+
+        for i, value in enumerate(rankings):
+            print('\nRoom ' + room_id + ' current rankings:')
+            print(str(i+1) + '. ' + value[0] + ' with the score of ' + str(value[1]))
+
+        print(rankings)
+        print(user_question_status[room_id])
+        emit('leaderboard', {'room_id': room_id, 'rankings': rankings, 'question_status': user_question_status[room_id]})
+
 if __name__ == '__main__':
     socketio.run(app, debug=True)

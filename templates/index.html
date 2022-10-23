@@ -11,12 +11,13 @@
          $(document).ready(function() {
          
            // sending a connect request to the server.
-         //   socket = io.connect();
+           socket = io.connect();
 
-         //   socket.emit('create_room', {
-         //           name: 'sunnyguan',
-         //           room_name: '1'
-         //    });
+           socket.emit('create_room', {
+                   name: 'sunnyguan',
+                   room_name: '1',
+                   difficulties: [1,1,2]
+            });
 
          //   socket.emit('join_room', {
          //           name: 'nhingo',
