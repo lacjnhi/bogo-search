@@ -86,7 +86,9 @@ def create_room(data):
         hard_question_numbers = random.sample(range(0, len(hard_questions)), hard)
 
         number_of_questions[room_id] = len(easy_question_numbers) + len(med_question_numbers) + len(hard_question_numbers)
+
         if number_of_questions[room_id] == 0:
+            emit({'message': 'Please choose more than 0 questions to get started!', 'type': 'error'})
             return 
 
         for question_id in easy_question_numbers:
@@ -120,6 +122,7 @@ def create_room(data):
 
         number_of_questions[room_id] = len(easy_question_numbers) + len(med_question_numbers) + len(hard_question_numbers)
         if number_of_questions[room_id] == 0:
+            emit({'message': 'No questions matched your preferences.', 'type': 'error'})
             return 
 
         for question_id in easy_question_numbers:
@@ -176,6 +179,7 @@ def create_room(data):
 
         number_of_questions[room_id] = len(easy_question_numbers) + len(med_question_numbers) + len(hard_question_numbers)
         if number_of_questions[room_id] == 0:
+            emit({'message': 'No questions matched your preferences.', 'type': 'error'})
             return 
 
         for question_id in easy_question_numbers:
@@ -338,6 +342,7 @@ def leave_room():
 
     if user_id not in current_users:
         print('User not in any room!')
+        emit({'message': 'You are not in a room', 'type': 'error'})
         return
 
     room_id = current_users[user_id][0]
@@ -475,6 +480,7 @@ def get_rankings():
         print(rankings)
         print(user_question_status[room_id])
         emit('leaderboard', {'room_id': room_id, 'rankings': rankings, 'question_status': user_question_status[room_id]})
+
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)
