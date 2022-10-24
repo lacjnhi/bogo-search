@@ -4,6 +4,7 @@ from flask_cors import CORS, cross_origin
 from flask_socketio import SocketIO, emit, send
 from collections import defaultdict
 import requests, json, random
+import time
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'test'
@@ -23,6 +24,7 @@ chat_logs = defaultdict(list)       # key: room id, value: list of messages
 room_number = 0
 
 user_scores = defaultdict(lambda: defaultdict(int)) # key: room_id value: {key: user value: score} 
+number_of_questions = defaultdict(int) # key: roomid value: number of questions
 
 LEETCODE_URL = "https://leetcode.com/api/problems/algorithms/"
 algorithms_problems_json = requests.get(LEETCODE_URL).content
@@ -56,6 +58,7 @@ def create_room(data):
     room_id = str(room_number) # request.sid
     rooms[room_id].append(data['name'])
     rooms[room_id] = list(set(rooms[room_id]))
+    number_of_questions[room_id] = easy + med + hard
 
     room_name_pairs1[room_id] = room_name
     room_name_pairs2[room_name] = room_id
@@ -63,15 +66,38 @@ def create_room(data):
     print("A new room is successfully created!\nThe list of rooms: ", rooms)
     current_users[user_id] = (room_id, data['name'])
 
-    # Generate random 4 leetcode questions
-    easy_question_numbers = [random.randint(0, len(easy_questions)) for _ in range(easy)]
-    med_question_numbers = [random.randint(0, len(med_questions)) for _ in range(med)]
-    hard_question_numbers = [random.randint(0, len(hard_questions)) for _ in range(hard)]
+    # Generate random leetcode questions
+    easy_question_numbers = set()
+    med_question_numbers = set()
+    hard_question_numbers = set()
+
+    i = 0
+    while i < easy:
+        tmp = random.randint(0, len(easy_questions)-1)
+        if tmp not in easy_question_numbers:
+            easy_question_numbers.add(tmp)
+            i += 1
+    easy_question_numbers = list(easy_question_numbers)
+
+    i = 0
+    while i < med:
+        tmp = random.randint(0, len(med_questions)-1)
+        if tmp not in med_question_numbers:
+            med_question_numbers.add(tmp)
+            i += 1
+    med_question_numbers = list(med_question_numbers)
+
+    i = 0
+    while i < hard:
+        tmp = random.randint(0, len(hard_questions)-1)
+        if tmp not in hard_question_numbers:
+            hard_question_numbers.add(tmp)
+            i += 1
+    hard_question_numbers = list(hard_question_numbers)
 
     list_of_question_links = []
     question_title = []
-
-    # generate easy questions
+    
     for question_id in easy_question_numbers:
         link = 'https://www.leetcode.com/problems/' + easy_questions[question_id]['stat']["question__title_slug"] + '/'
         difficulty = 1
@@ -104,7 +130,7 @@ def create_room(data):
     user_question_status[room_id][data['name']] = []
     user_scores[room_id][data['name']] = 0
 
-    for i in range(4):
+    for i in range(number_of_questions[room_id]):
         # (title, links, difficulty)
         room_questions[room_id].append((question_title[i], list_of_question_links[i][0], list_of_question_links[i][1]))
         user_question_status[room_id][data['name']].append(0)
@@ -181,7 +207,7 @@ def join_room(data):
             # add question status
             if user not in user_scores[room_id]:
                 user_scores[room_id][user] = 0
-                for _ in range(4):
+                for _ in range(number_of_questions[room_id]):
                     user_question_status[room_id][user].append(0)
                 print(user_question_status)
 
@@ -210,8 +236,10 @@ def leave_room():
         del room_name_pairs1[room_id]
         del room_name_pairs2[room_name]
         del user_question_status[room_id]
+        del number_of_questions[room_id]
         if room_id in user_scores:
             del user_scores[room_id]
+
     else:
         room_name = room_name_pairs1[room_id]
         print("User " + user + " disconnected from " + str(room_id) + ". The users in the current room " +  str(room_id) + " are: ")
@@ -242,6 +270,11 @@ def messaging(data):
     msg_type = data['type'] if 'type' in data else 'chat'
     include_self = data['include_self'] if 'include_self' in data else True
 
+    # get current time
+    t = time.localtime()
+    cur_time = time.strftime('%H:%M', t)
+    print(cur_time)
+
     print(msg)
     user_id = request.sid
     if user_id in current_users:
@@ -250,7 +283,7 @@ def messaging(data):
 
         room_name = room_name_pairs1[room_id]
 
-        tmp = {'message': msg, 'user': user_id, 'name': user, 'type': msg_type, 'room_name': room_name}
+        tmp = {'message': msg, 'user': user_id, 'name': user, 'type': msg_type, 'room_name': room_name, 'time': cur_time}
         chat_logs[room_id].append(tmp)
 
         print('Received message from ' + user + ': ' + msg + ' in room ' + room_name)
@@ -276,7 +309,14 @@ def send_submission(data):
         room_id = current_users[user_id][0]
 
         if submission_status != 'Accepted':
-            msg = current_users[user_id][1] + ' submitted question ' + str(id+1) + '!'
+            if submission_status == 'Wrong Answer' or submission_status == 'Runtime Error':
+                msg = current_users[user_id][1] + ' submitted question ' + str(id+1) + '. Error: Code is wrong, do better.'
+            elif submission_status == 'Compile Error':
+                msg = current_users[user_id][1] + ' submitted question ' + str(id+1) + '. Error: Code cannot be compiled, do better.'
+            elif submission_status == 'Time Limit Exceeded':
+                msg = current_users[user_id][1] + ' submitted question ' + str(id+1) + '. Error: Time Limit Exceeded. Your code runs slower than my grandma, do better.'
+            else:
+                msg = current_users[user_id][1] + ' submitted question ' + str(id+1) + '!'
 
             # set status to 1: started but unsuccessful
             user_question_status[room_id][user][id] = 1
@@ -288,7 +328,7 @@ def send_submission(data):
             # set status to 2: successfully solved
             user_question_status[room_id][user][id] = 2
 
-            msg = user + ' completed the problem ' + str(id+1) + ' in ' + language + ', beat ' + str(percentile) + '% of users!'
+            msg = user + ' completed the problem ' + str(id+1) + ' in ' + language + ', beat ' + str(round(percentile, 2)) + '% of users!'
             messaging({'message': msg, 'type': 'submission'})
             user_scores[room_id][user] += difficulty
 
