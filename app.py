@@ -26,8 +26,8 @@ room_number = 0
 user_scores = defaultdict(lambda: defaultdict(int)) # key: room_id value: {key: user value: score} 
 number_of_questions = defaultdict(int) # key: roomid value: number of questions
 
-LEETCODE_URL = "https://leetcode.com/api/problems/algorithms/"
-file = open('lc_questions.json')
+# LEETCODE_URL = "https://leetcode.com/api/problems/algorithms/"
+file = open('data/lc_questions.json')
 algorithms_problems_json = json.load(file)
 algorithms_problems_json = algorithms_problems_json['data']['problemsetQuestionList']['questions']
 file.close()
@@ -164,9 +164,11 @@ def create_room(data):
         med_problems = generate_multiple_topics(possible_med, med)
         hard_problems = generate_multiple_topics(possible_hard, hard)
 
+        print('\n')
         print(easy_problems)
         print(med_problems)
         print(hard_problems)
+        print('\n')
 
         for k, v in easy_problems.items():
             easy_question_numbers.extend(generate_questions(k, v))
@@ -176,6 +178,12 @@ def create_room(data):
 
         for k, v in hard_problems.items():
             hard_question_numbers.extend(generate_questions(k, v))
+
+        print('\n')
+        print(easy_question_numbers)
+        print(med_question_numbers)
+        print(hard_question_numbers)
+        print('\n')
 
         number_of_questions[room_id] = len(easy_question_numbers) + len(med_question_numbers) + len(hard_question_numbers)
         if number_of_questions[room_id] == 0:
@@ -217,6 +225,7 @@ def create_room(data):
     # add question status
     user_question_status[room_id][data['name']] = []
     user_scores[room_id][data['name']] = 0
+    room_questions[room_id] = []
 
     for i in range(number_of_questions[room_id]):
         # (title, links, difficulty)
@@ -254,20 +263,20 @@ def generate_multiple_topics(possible, count):
     
     return problems
 
-file = open('lc_topics.json')
+file = open('data/lc_topics.json')
 question_topic_difficulty = json.load(file)
 def generate_questions(request, count): # request is formatted as "Topic, Diff"
     if request in question_topic_difficulty:
         question_list = question_topic_difficulty[request]
-        print(question_list)
         questions = []
         
         if len(question_list) <= count:
             return question_list
         else:
             questions = random.sample(range(0, len(question_list)), count)
+            print(questions)
 
-            return [question_list[i] for i in range(len(questions))]
+            return [question_list[i] for i in questions]
     else:
         return []
 
@@ -363,6 +372,7 @@ def leave_room():
         del room_name_pairs2[room_name]
         del user_question_status[room_id]
         del number_of_questions[room_id]
+        del room_questions[room_id]
         if room_id in user_scores:
             del user_scores[room_id]
 
