@@ -26,16 +26,51 @@ room_number = 0
 user_scores = defaultdict(lambda: defaultdict(int)) # key: room_id value: {key: user value: score} 
 number_of_questions = defaultdict(int) # key: roomid value: number of questions
 
-# LEETCODE_URL = "https://leetcode.com/api/problems/algorithms/"
 file = open('data/lc_questions.json')
 algorithms_problems_json = json.load(file)
 algorithms_problems_json = algorithms_problems_json['data']['problemsetQuestionList']['questions']
 file.close()
 
+file = open('data/title_to_id.json')
+title_id_map = json.load(file)
+file.close()
+# print(title_id_map)
+
+blind_id = {0, 256, 2, 132, 4, 10, 511, 140, 138, 14, 142, 271, 18, 19, 20, 22, 151, 
+152, 284, 32, 290, 933, 38, 301, 47, 48, 52, 53, 54, 55, 56, 182, 181, 189, 61, 191, 
+197, 198, 199, 69, 72, 202, 75, 203, 204, 78, 208, 464, 344, 217, 90, 349, 221, 97, 
+226, 99, 356, 229, 101, 103, 104, 233, 240, 120, 123, 124, 253, 254, 127}
+# file = open('data/blind75.json')
+# blind75_problems_list = json.load(file)
+# for title in blind75_problems_list:
+#     if title in title_id_map:
+#         blind_id.add(title_id_map[title])
+# print(blind_id)
+# file.close()
+
+neetcode_id = {0, 1, 2, 3, 4, 6, 9, 10, 14, 16, 18, 19, 20, 21, 22, 24, 537, 541, 32, 
+35, 38, 39, 551, 41, 42, 44, 45, 558, 559, 48, 47, 50, 49, 52, 53, 54, 55, 56, 1593, 
+61, 65, 69, 71, 72, 73, 75, 587, 77, 78, 590, 593, 83, 89, 90, 604, 96, 97, 99, 101, 
+103, 104, 616, 109, 625, 114, 120, 123, 124, 126, 127, 1153, 130, 129, 132, 133, 135, 
+137, 138, 140, 142, 145, 149, 151, 152, 154, 160, 683, 690, 181, 182, 189, 190, 191, 
+193, 197, 198, 199, 712, 201, 202, 203, 204, 206, 208, 217, 221, 226, 229, 230, 233, 
+1260, 240, 249, 253, 254, 256, 262, 264, 271, 276, 279, 284, 290, 295, 810, 301, 818, 
+831, 343, 344, 349, 356, 882, 406, 933, 426, 1468, 446, 463, 464, 1506, 492, 511}
+# file = open('data/neetcode150.json')
+# neetcode150_problems_list = json.load(file)
+# for title in neetcode150_problems_list:
+#     if title in title_id_map:
+#         neetcode_id.add(title_id_map[title])
+# print(neetcode_id)
+# file.close()
+
+# LEETCODE_URL = "https://leetcode.com/api/problems/algorithms/"
 @socketio.on('create_room')
 def create_room(data):
-
     global algorithms_problems_json
+    # get from either all questions, blind 75, or neetcode 150
+    problem_set = data['problemset']
+
     # free and easy questions
     # algorithms_problems_json = [obj for obj in algorithms_problems_json if not obj['paid_only'] and obj['difficulty']['level'] == 1]
     # free questions
@@ -114,11 +149,11 @@ def create_room(data):
     # user provides only 1 topic
     elif len(topics) == 1 and (easy == 0 and med == 0) or (easy == 0 or hard == 0) or (hard == 0 and med == 0):
         if easy == 0 and med == 0:
-            hard_question_numbers.extend(generate_questions(topics[0] + ', Hard', hard))
+            hard_question_numbers.extend(generate_questions(topics[0] + ', Hard', hard, problem_set))
         elif easy == 0 and hard == 0:
-            med_question_numbers.extend(generate_questions(topics[0] + ', Medium', med))
+            med_question_numbers.extend(generate_questions(topics[0] + ', Medium', med, problem_set))
         elif hard == 0 and med == 0:
-            easy_question_numbers.extend(generate_questions(topics[0] + ', Easy', easy))
+            easy_question_numbers.extend(generate_questions(topics[0] + ', Easy', easy, problem_set))
 
         number_of_questions[room_id] = len(easy_question_numbers) + len(med_question_numbers) + len(hard_question_numbers)
         if number_of_questions[room_id] == 0:
@@ -171,13 +206,13 @@ def create_room(data):
         print('\n')
 
         for k, v in easy_problems.items():
-            easy_question_numbers.extend(generate_questions(k, v))
+            easy_question_numbers.extend(generate_questions(k, v, problem_set))
 
         for k, v in med_problems.items():
-            med_question_numbers.extend(generate_questions(k, v))
+            med_question_numbers.extend(generate_questions(k, v, problem_set))
 
         for k, v in hard_problems.items():
-            hard_question_numbers.extend(generate_questions(k, v))
+            hard_question_numbers.extend(generate_questions(k, v, problem_set))
 
         print('\n')
         print(easy_question_numbers)
@@ -265,17 +300,44 @@ def generate_multiple_topics(possible, count):
 
 file = open('data/lc_topics.json')
 question_topic_difficulty = json.load(file)
-def generate_questions(request, count): # request is formatted as "Topic, Diff"
+def generate_questions(request, count, type): # request is formatted as "Topic, Diff"
     if request in question_topic_difficulty:
         question_list = question_topic_difficulty[request]
         questions = []
         
-        if len(question_list) <= count:
-            return question_list
-        else:
-            questions = random.sample(range(0, len(question_list)), count)
+        if type == 'blind75':
+            new_list = []
 
-            return [question_list[i] for i in questions]
+            for q in question_list:
+                if q in blind_id:
+                    new_list.append(q)
+
+            if len(new_list) <= count:
+                return new_list
+            else:
+                questions = random.sample(range(0, len(new_list)), count)
+
+                return [new_list[i] for i in questions]
+        elif type == 'neetcode150':
+            new_list = []
+
+            for q in question_list:
+                if q in neetcode_id:
+                    new_list.append(q)
+
+            if len(new_list) <= count:
+                return new_list
+            else:
+                questions = random.sample(range(0, len(new_list)), count)
+
+                return [new_list[i] for i in questions]
+        else:
+            if len(question_list) <= count:
+                return question_list
+            else:
+                questions = random.sample(range(0, len(question_list)), count)
+
+                return [question_list[i] for i in questions]
     else:
         return []
 

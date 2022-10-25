@@ -4,7 +4,7 @@ import json
 question_topics = defaultdict(list)
 topic_list = set()
 def generate_topics():
-    f = open('data/lc_questions.json')
+    f = open('data/blind75.json')
     questions = json.load(f)['data']['problemsetQuestionList']['questions']
     questions = [obj for obj in questions if not obj['paidOnly']]
 
