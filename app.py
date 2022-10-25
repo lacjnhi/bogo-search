@@ -40,6 +40,7 @@ blind_id = {0, 256, 2, 132, 4, 10, 511, 140, 138, 14, 142, 271, 18, 19, 20, 22, 
 152, 284, 32, 290, 933, 38, 301, 47, 48, 52, 53, 54, 55, 56, 182, 181, 189, 61, 191, 
 197, 198, 199, 69, 72, 202, 75, 203, 204, 78, 208, 464, 344, 217, 90, 349, 221, 97, 
 226, 99, 356, 229, 101, 103, 104, 233, 240, 120, 123, 124, 253, 254, 127}
+
 # file = open('data/blind75.json')
 # blind75_problems_list = json.load(file)
 # for title in blind75_problems_list:
@@ -56,6 +57,7 @@ neetcode_id = {0, 1, 2, 3, 4, 6, 9, 10, 14, 16, 18, 19, 20, 21, 22, 24, 537, 541
 193, 197, 198, 199, 712, 201, 202, 203, 204, 206, 208, 217, 221, 226, 229, 230, 233, 
 1260, 240, 249, 253, 254, 256, 262, 264, 271, 276, 279, 284, 290, 295, 810, 301, 818, 
 831, 343, 344, 349, 356, 882, 406, 933, 426, 1468, 446, 463, 464, 1506, 492, 511}
+
 # file = open('data/neetcode150.json')
 # neetcode150_problems_list = json.load(file)
 # for title in neetcode150_problems_list:
@@ -73,6 +75,7 @@ def create_room(data):
 
     # free and easy questions
     # algorithms_problems_json = [obj for obj in algorithms_problems_json if not obj['paid_only'] and obj['difficulty']['level'] == 1]
+    
     # free questions
     algorithms_problems_json = [obj for obj in algorithms_problems_json if not obj['paidOnly']]
     easy_questions = [obj for obj in algorithms_problems_json if obj['difficulty'] == 'Easy']
