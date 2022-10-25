@@ -111,8 +111,6 @@ def create_room(data):
     hard_question_numbers = []
 
     topics = data['topics']   
-    print(easy, med, hard)
-    print()
 
     list_of_question_links = []
     question_title = []
@@ -150,7 +148,7 @@ def create_room(data):
             question_title.append(hard_questions[question_id]["title"])
 
     # user provides only 1 topic
-    elif len(topics) == 1 and (easy == 0 and med == 0) or (easy == 0 or hard == 0) or (hard == 0 and med == 0):
+    elif len(topics) == 1 and (easy == 0 and med == 0) or (easy == 0 and hard == 0) or (hard == 0 and med == 0):
         if easy == 0 and med == 0:
             hard_question_numbers.extend(generate_questions(topics[0] + ', Hard', hard, problem_set))
         elif easy == 0 and hard == 0:
@@ -315,6 +313,7 @@ def generate_questions(request, count, type): # request is formatted as "Topic, 
                 if q in blind_id:
                     new_list.append(q)
 
+            print(new_list)
             if len(new_list) <= count:
                 return new_list
             else:
