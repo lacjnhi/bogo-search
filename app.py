@@ -274,7 +274,6 @@ def generate_questions(request, count): # request is formatted as "Topic, Diff"
             return question_list
         else:
             questions = random.sample(range(0, len(question_list)), count)
-            print(questions)
 
             return [question_list[i] for i in questions]
     else:
