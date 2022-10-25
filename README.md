@@ -1,5 +1,5 @@
 ## Bogo Search
-A Chrome Extension to create rooms on Leetcode to compete solving programming questions with friends 
+A Chrome Extension to create rooms on Leetcode to compete solving programming questions with friends.
 
 Check out https://github.com/sunnyguan/leetcode-rooms-chrome-extension for more info!
 
