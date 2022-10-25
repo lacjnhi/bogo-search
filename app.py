@@ -356,9 +356,6 @@ def retrieve_room_info():
         emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name}, room=room_id)
         emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'chatlog': convo, 'room_name': room_name})
 
-        # print('Chat logs:')
-        # print(chat_logs)
-
 @socketio.on('join_room')
 def join_room(data):
     user_id = request.sid
