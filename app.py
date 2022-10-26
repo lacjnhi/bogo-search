@@ -33,6 +33,7 @@ number_of_questions = defaultdict(int) # key: roomid value: number of questions
 file = open('data/lc_questions.json')
 algorithms_problems_json = json.load(file)
 algorithms_problems_json = algorithms_problems_json['data']['problemsetQuestionList']['questions']
+algorithms_problems_json = [obj for obj in algorithms_problems_json if not obj['paidOnly']]
 file.close()
 
 file = open('data/title_to_id.json')
@@ -41,20 +42,41 @@ file.close()
 # print(title_id_map)
 
 blind_id = set()
+blind_easy = []
+blind_med = []
+blind_hard = []
 file = open('data/blind75.json')
 blind75_problems_list = json.load(file)
 for title in blind75_problems_list:
     if title in title_id_map:
-        blind_id.add(title_id_map[title])
+        id = title_id_map[title]
+        blind_id.add(id)
+        if algorithms_problems_json[id]['difficulty'] == 'Easy':
+            blind_easy.append(id)
+        elif algorithms_problems_json[id]['difficulty'] == 'Medium':
+            blind_med.append(id)
+        elif algorithms_problems_json[id]['difficulty'] == 'Hard':
+            blind_hard.append(id)
+        
 # print(blind_id)
 file.close()
 
 neetcode_id = set()
+neetcode_easy = []
+neetcode_med = []
+neetcode_hard = []
 file = open('data/neetcode150.json')
 neetcode150_problems_list = json.load(file)
 for title in neetcode150_problems_list:
     if title in title_id_map:
-        neetcode_id.add(title_id_map[title])
+        id = title_id_map[title]
+        neetcode_id.add(id)
+        if algorithms_problems_json[id]['difficulty'] == 'Easy':
+            neetcode_easy.append(id)
+        elif algorithms_problems_json[id]['difficulty'] == 'Medium':
+            neetcode_med.append(id)
+        elif algorithms_problems_json[id]['difficulty'] == 'Hard':
+            neetcode_hard.append(id)
 # print(neetcode_id)
 file.close()
 
@@ -225,18 +247,12 @@ def restart():
     questions_generator(easy, med, hard, topics, problem_set)
     retrieve_room_info()
 
-
 def questions_generator(easy, med, hard, topics, problem_set):
     user_id = request.sid
     user = current_users[user_id][1]
     room_id = current_users[user_id][0]
 
     global algorithms_problems_json
-
-    algorithms_problems_json = [obj for obj in algorithms_problems_json if not obj['paidOnly']]
-    easy_questions = [obj for obj in algorithms_problems_json if obj['difficulty'] == 'Easy']
-    med_questions = [obj for obj in algorithms_problems_json if obj['difficulty'] == 'Medium']
-    hard_questions = [obj for obj in algorithms_problems_json if obj['difficulty'] == 'Hard']
 
     # Generate random leetcode questions
     easy_question_numbers = []
@@ -248,35 +264,71 @@ def questions_generator(easy, med, hard, topics, problem_set):
 
     # user do not provide topics
     if not topics:
-        easy_question_numbers = random.sample(range(0, len(easy_questions)), easy)
-        med_question_numbers = random.sample(range(0, len(med_questions)), med)
-        hard_question_numbers = random.sample(range(0, len(hard_questions)), hard)
+        if problem_set == 'blind75' or problem_set == 'neetcode150':
+            easy_question_numbers = generate_questions_no_topics(easy, 1, problem_set)
+            med_question_numbers = generate_questions_no_topics(med, 2, problem_set)
+            hard_question_numbers = generate_questions_no_topics(hard, 3, problem_set)
 
-        number_of_questions[room_id] = len(easy_question_numbers) + len(med_question_numbers) + len(hard_question_numbers)
+            number_of_questions[room_id] = len(easy_question_numbers) + len(med_question_numbers) + len(hard_question_numbers)
 
-        if number_of_questions[room_id] == 0:
-            emit({'message': 'Please choose more than 0 questions to get started!', 'type': 'error'})
-            return 
+            if number_of_questions[room_id] == 0:
+                emit({'message': 'No questions matched preferences!', 'type': 'error'})
+                return 
 
-        for question_id in easy_question_numbers:
-            link = 'https://www.leetcode.com/problems/' + easy_questions[question_id]['titleSlug'] + '/'
-            difficulty = 1
-            list_of_question_links.append((link, difficulty))
-            question_title.append(easy_questions[question_id]["title"])
+            for question_id in easy_question_numbers:
+                link = 'https://www.leetcode.com/problems/' + algorithms_problems_json[question_id]['titleSlug'] + '/'
+                difficulty = 1
+                list_of_question_links.append((link, difficulty))
+                question_title.append(algorithms_problems_json[question_id]["title"])
 
-        # generate med questions
-        for question_id in med_question_numbers:
-            link = 'https://www.leetcode.com/problems/' + med_questions[question_id]['titleSlug'] + '/'
-            difficulty = 2
-            list_of_question_links.append((link, difficulty))
-            question_title.append(med_questions[question_id]['title'])
+            # generate med questions
+            for question_id in med_question_numbers:
+                link = 'https://www.leetcode.com/problems/' + algorithms_problems_json[question_id]['titleSlug'] + '/'
+                difficulty = 2
+                list_of_question_links.append((link, difficulty))
+                question_title.append(algorithms_problems_json[question_id]['title'])
 
-        # generate hard questions
-        for question_id in hard_question_numbers:
-            link = 'https://www.leetcode.com/problems/' + hard_questions[question_id]['titleSlug'] + '/'
-            difficulty = 3
-            list_of_question_links.append((link, difficulty))
-            question_title.append(hard_questions[question_id]["title"])
+            # generate hard questions
+            for question_id in hard_question_numbers:
+                link = 'https://www.leetcode.com/problems/' + algorithms_problems_json[question_id]['titleSlug'] + '/'
+                difficulty = 3
+                list_of_question_links.append((link, difficulty))
+                question_title.append(algorithms_problems_json[question_id]["title"])
+
+        else:
+            easy_questions = [obj for obj in algorithms_problems_json if obj['difficulty'] == 'Easy']
+            med_questions = [obj for obj in algorithms_problems_json if obj['difficulty'] == 'Medium']
+            hard_questions = [obj for obj in algorithms_problems_json if obj['difficulty'] == 'Hard']
+
+            easy_question_numbers = random.sample(range(0, len(easy_questions)), easy)
+            med_question_numbers = random.sample(range(0, len(med_questions)), med)
+            hard_question_numbers = random.sample(range(0, len(hard_questions)), hard)
+
+            number_of_questions[room_id] = len(easy_question_numbers) + len(med_question_numbers) + len(hard_question_numbers)
+
+            if number_of_questions[room_id] == 0:
+                emit({'message': 'Please choose more than 0 questions to get started!', 'type': 'error'})
+                return 
+
+            for question_id in easy_question_numbers:
+                link = 'https://www.leetcode.com/problems/' + easy_questions[question_id]['titleSlug'] + '/'
+                difficulty = 1
+                list_of_question_links.append((link, difficulty))
+                question_title.append(easy_questions[question_id]["title"])
+
+            # generate med questions
+            for question_id in med_question_numbers:
+                link = 'https://www.leetcode.com/problems/' + med_questions[question_id]['titleSlug'] + '/'
+                difficulty = 2
+                list_of_question_links.append((link, difficulty))
+                question_title.append(med_questions[question_id]['title'])
+
+            # generate hard questions
+            for question_id in hard_question_numbers:
+                link = 'https://www.leetcode.com/problems/' + hard_questions[question_id]['titleSlug'] + '/'
+                difficulty = 3
+                list_of_question_links.append((link, difficulty))
+                question_title.append(hard_questions[question_id]["title"])
 
     # user provides only 1 topic
     elif len(topics) == 1 and (easy == 0 and med == 0) or (easy == 0 and hard == 0) or (hard == 0 and med == 0):
@@ -390,6 +442,35 @@ def questions_generator(easy, med, hard, topics, problem_set):
     print(room_questions)
     print(user_question_status)
 
+def generate_questions_no_topics(count, level, type):
+    questions_id = []
+
+    if level == 1:
+        if type == 'blind75':
+            pset = blind_easy  
+        else:
+            pset = neetcode_easy
+    elif level == 2:
+        if type == 'blind75':
+            pset = blind_med  
+        else:
+            pset = neetcode_med
+    elif level == 3:
+        if type == 'blind75':
+            pset = blind_hard 
+        else:
+            pset = neetcode_hard
+    else:
+        return []
+
+    if count > len(pset):
+        questions_id = pset
+    else:
+        random_ids = random.sample(range(0, len(pset)), count)
+        questions_id = [pset[i] for i in random_ids]
+    
+    return questions_id
+
 def generate_multiple_topics(possible, count):
     problems = defaultdict(int)
     if count <= len(possible):
@@ -424,7 +505,6 @@ def generate_questions(request, count, type): # request is formatted as "Topic, 
                 if q in blind_id:
                     new_list.append(q)
 
-            print(new_list)
             if len(new_list) <= count:
                 return new_list
             else:
