@@ -9,5 +9,6 @@ RUN pip install -r /requirements.txt
 COPY . /
 WORKDIR /
 ENV PORT 5000
+ENV PYTHONUNBUFFERED 1
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--worker-class", "eventlet", "app:app"]
 
