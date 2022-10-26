@@ -23,6 +23,7 @@ room_name_pairs2 = defaultdict(str) # key: room name, value: room id
 chat_logs = defaultdict(list)       # key: room id, value: list of messages
 room_owner = defaultdict(str)       # key: room id, value: owner of the room
 room_question_topics_and_difficulty = defaultdict(object) # key: roomid, value: list of possible pairs of questions
+room_start = defaultdict(bool)       # key: room id, 
 
 room_number = 0
 
@@ -81,6 +82,7 @@ def create_room(data):
     room_name_pairs1[room_id] = room_name
     room_name_pairs2[room_name] = room_id
     current_users[user_id] = (room_id, data['name'])
+    room_start[room_id] = False
 
     # get from either all questions, blind 75, or neetcode 150
     problem_set = data['problemset']
@@ -99,11 +101,12 @@ def create_room(data):
 
     players = rooms[room_id]
     questions = room_questions[room_id]
-    emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name})
+    emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name, 'is_owner': True})
     socketio.server.enter_room(user_id, room_id)
 
     print("A new room is successfully created!\nThe list of rooms: ", rooms)
     messaging({'message': data['name'] + ' just joined the room!', 'type': 'admin'})
+    messaging({'message': 'Hey ' + data['name'] + '👋, round has not started yet! You can start anytime by clicking the "start" button!', 'type': 'start'})
 
 @socketio.on('retrieve_room_info')
 def retrieve_room_info():
@@ -118,8 +121,19 @@ def retrieve_room_info():
         convo = chat_logs[room_id]
         room_name = room_name_pairs1[room_id]
 
-        emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name}, room=room_id)
-        emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'chatlog': convo, 'room_name': room_name, 'is_owner': room_owner[room_id] == user})
+        emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name, 'is_started': room_start[room_id]}, room=room_id)
+        emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'chatlog': convo, 'room_name': room_name, 'is_owner': room_owner[room_id] == user, 'is_started': room_start[room_id]})
+
+@socketio.on('ready')
+def start_room():
+    user_id = request.sid
+    room_id = current_users[user_id][0]
+
+    room_start[room_id] = True
+
+    emit('start', {'timer': 0}, room=room_id)
+    messaging({'message': 'Round has started🏃! Have fun!', 'type': 'start'})
+
 
 @socketio.on('join_room')
 def join_room(data):
@@ -155,6 +169,7 @@ def join_room(data):
             convo = user + ' just joined room ' + room_name + '!'
 
             messaging({'message': convo, 'type': 'admin'})
+            messaging({'message': 'Hey ' + user + '👋, round has not started yet! Please wait for the moderator to start this round!', 'type': 'start'})
             emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'chatlog': chat_logs[room_id], 'room_name': room_name})
             emit('room_info', {'players': players}, room=room_id)
 
@@ -168,11 +183,13 @@ def join_room(data):
                     user_question_status[room_id][user].append(0)
                 print(user_question_status)
 
+
 @socketio.on('restart')
 def restart():
     user_id = request.sid
     room_id = current_users[user_id][0]
     user = current_users[user_id][1]
+    room_start[room_id] = False
 
     room_questions[room_id] = []
     easy = room_question_topics_and_difficulty[room_id]['easy']
@@ -198,6 +215,7 @@ def restart():
             for _ in range(number_of_questions[room_id]):
                 user_question_status[room_id][player].append(0)
 
+    messaging({'message': 'Room stopped 🛑! Waiting for the room moderator to start ⌛...', 'type': 'start'})
 
     questions_generator(easy, med, hard, topics, problem_set)
     retrieve_room_info()
@@ -461,6 +479,7 @@ def leave_room():
         del number_of_questions[room_id]
         del room_questions[room_id]
         del room_owner[room_id]
+        del room_start[room_id]
 
         if room_id in room_question_topics_and_difficulty:
             del room_question_topics_and_difficulty[room_id]
