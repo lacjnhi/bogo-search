@@ -133,7 +133,7 @@ def create_room(data):
 @socketio.on('retrieve_room_info')
 def retrieve_room_info():
     user_id = request.sid
-    print(current_users)
+    print(current_users, user_id, user_id in current_users)
 
     if user_id in current_users:
         room_id = current_users[user_id][0]
