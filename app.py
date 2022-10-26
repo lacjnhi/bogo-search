@@ -17,10 +17,13 @@ def index():
 
 rooms = defaultdict(list)           # key: room,    value: list of users
 current_users = defaultdict(tuple)  # key: room id, value: (room id, username)
-room_questions = defaultdict(list)  # key: room id, value: list of questions + its title
+room_questions = defaultdict(list)  # key: room id, value: list of questions + its title + difficulty
 room_name_pairs1 = defaultdict(str) # key: room id, value: room name
 room_name_pairs2 = defaultdict(str) # key: room name, value: room id
 chat_logs = defaultdict(list)       # key: room id, value: list of messages
+room_owner = defaultdict(str)       # key: room id, value: owner of the room
+room_question_topics_and_difficulty = defaultdict(object) # key: roomid, value: list of possible pairs of questions
+
 room_number = 0
 
 user_scores = defaultdict(lambda: defaultdict(int)) # key: room_id value: {key: user value: score} 
@@ -36,28 +39,14 @@ title_id_map = json.load(file)
 file.close()
 # print(title_id_map)
 
-# blind_id = {0, 256, 2, 132, 4, 10, 511, 140, 138, 14, 142, 271, 18, 19, 20, 22, 151, 
-# 152, 284, 32, 290, 933, 38, 301, 47, 48, 52, 53, 54, 55, 56, 182, 181, 189, 61, 191, 
-# 197, 198, 199, 69, 72, 202, 75, 203, 204, 78, 208, 464, 344, 217, 90, 349, 221, 97, 
-# 226, 99, 356, 229, 101, 103, 104, 233, 240, 120, 123, 124, 253, 254, 127}
-
 blind_id = set()
 file = open('data/blind75.json')
 blind75_problems_list = json.load(file)
 for title in blind75_problems_list:
     if title in title_id_map:
         blind_id.add(title_id_map[title])
-print(blind_id)
+# print(blind_id)
 file.close()
-
-# neetcode_id = {0, 1, 2, 3, 4, 6, 9, 10, 14, 16, 18, 19, 20, 21, 22, 24, 537, 541, 32, 
-# 35, 38, 39, 551, 41, 42, 44, 45, 558, 559, 48, 47, 50, 49, 52, 53, 54, 55, 56, 1593, 
-# 61, 65, 69, 71, 72, 73, 75, 587, 77, 78, 590, 593, 83, 89, 90, 604, 96, 97, 99, 101, 
-# 103, 104, 616, 109, 625, 114, 120, 123, 124, 126, 127, 1153, 130, 129, 132, 133, 135, 
-# 137, 138, 140, 142, 145, 149, 151, 152, 154, 160, 683, 690, 181, 182, 189, 190, 191, 
-# 193, 197, 198, 199, 712, 201, 202, 203, 204, 206, 208, 217, 221, 226, 229, 230, 233, 
-# 1260, 240, 249, 253, 254, 256, 262, 264, 271, 276, 279, 284, 290, 295, 810, 301, 818, 
-# 831, 343, 344, 349, 356, 882, 406, 933, 426, 1468, 446, 463, 464, 1506, 492, 511}
 
 neetcode_id = set()
 file = open('data/neetcode150.json')
@@ -65,25 +54,12 @@ neetcode150_problems_list = json.load(file)
 for title in neetcode150_problems_list:
     if title in title_id_map:
         neetcode_id.add(title_id_map[title])
-print(neetcode_id)
+# print(neetcode_id)
 file.close()
 
 # LEETCODE_URL = "https://leetcode.com/api/problems/algorithms/"
 @socketio.on('create_room')
 def create_room(data):
-    global algorithms_problems_json
-    # get from either all questions, blind 75, or neetcode 150
-    problem_set = data['problemset']
-
-    # free and easy questions
-    # algorithms_problems_json = [obj for obj in algorithms_problems_json if not obj['paid_only'] and obj['difficulty']['level'] == 1]
-    
-    # free questions
-    algorithms_problems_json = [obj for obj in algorithms_problems_json if not obj['paidOnly']]
-    easy_questions = [obj for obj in algorithms_problems_json if obj['difficulty'] == 'Easy']
-    med_questions = [obj for obj in algorithms_problems_json if obj['difficulty'] == 'Medium']
-    hard_questions = [obj for obj in algorithms_problems_json if obj['difficulty'] == 'Hard']
-
     # Add user in a room
     user_id = request.sid
     room_name = data['room_name']
@@ -95,24 +71,154 @@ def create_room(data):
     if user_id in current_users:
         leave_room()
 
+    # set up user info
     global room_number
     room_number += 1
     room_id = str(room_number) # request.sid
     rooms[room_id].append(data['name'])
     rooms[room_id] = list(set(rooms[room_id]))
-    number_of_questions[room_id] = easy + med + hard
-
+    room_owner[room_id] = data['name']
     room_name_pairs1[room_id] = room_name
     room_name_pairs2[room_name] = room_id
-
     current_users[user_id] = (room_id, data['name'])
+
+    # get from either all questions, blind 75, or neetcode 150
+    problem_set = data['problemset']
+    topics = data['topics']   
+
+    room_question_topics_and_difficulty[room_id] = {
+        'easy': easy,
+        'med': med,
+        'hard': hard,
+        'problemset': problem_set,
+        'topics': topics
+    }
+    print(room_question_topics_and_difficulty)
+
+    questions_generator(easy, med, hard, topics, problem_set)
+
+    players = rooms[room_id]
+    questions = room_questions[room_id]
+    emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name})
+    socketio.server.enter_room(user_id, room_id)
+
+    print("A new room is successfully created!\nThe list of rooms: ", rooms)
+    messaging({'message': data['name'] + ' just joined the room!', 'type': 'admin'})
+
+@socketio.on('retrieve_room_info')
+def retrieve_room_info():
+    user_id = request.sid
+    print(current_users)
+
+    if user_id in current_users:
+        room_id = current_users[user_id][0]
+        user = current_users[user_id][1]
+        players = rooms[room_id]
+        questions = room_questions[room_id]
+        convo = chat_logs[room_id]
+        room_name = room_name_pairs1[room_id]
+
+        emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name}, room=room_id)
+        emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'chatlog': convo, 'room_name': room_name, 'is_owner': room_owner[room_id] == user})
+
+@socketio.on('join_room')
+def join_room(data):
+    user_id = request.sid
+    tmp = data['room_id']
+
+    if not tmp.isdigit():
+        room_name = tmp
+        room_id = room_name_pairs2[room_name]
+    else:
+        room_id = tmp
+        room_name = room_name_pairs1[room_id]
+
+    user = data['name']
+
+    if room_id in rooms:
+        rooms[room_id].append(user)
+        rooms[room_id] = list(set(rooms[room_id]))
+
+        if user_id in current_users and current_users[user_id][0] != room_id:
+            print('test')
+            leave_room()
+        
+        if user_id not in current_users:
+            print('test2')
+            socketio.server.enter_room(user_id, room_id)
+            current_users[user_id] = (room_id, user)
+
+            room_name = room_name_pairs1[room_id]
+
+            players = rooms[room_id]
+            questions = room_questions[room_id]
+            convo = user + ' just joined room ' + room_name + '!'
+
+            messaging({'message': convo, 'type': 'admin'})
+            emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'chatlog': chat_logs[room_id], 'room_name': room_name})
+            emit('room_info', {'players': players}, room=room_id)
+
+            print("New user join room " + room_name + ". The users now are: ", rooms[room_id])
+            print(rooms)
+
+            # add question status
+            if user not in user_scores[room_id]:
+                user_scores[room_id][user] = 0
+                for _ in range(number_of_questions[room_id]):
+                    user_question_status[room_id][user].append(0)
+                print(user_question_status)
+
+@socketio.on('restart')
+def restart():
+    user_id = request.sid
+    room_id = current_users[user_id][0]
+    user = current_users[user_id][1]
+
+    room_questions[room_id] = []
+    easy = room_question_topics_and_difficulty[room_id]['easy']
+    med = room_question_topics_and_difficulty[room_id]['med']
+    hard = room_question_topics_and_difficulty[room_id]['hard']
+    problem_set = room_question_topics_and_difficulty[room_id]['problemset']
+    topics = room_question_topics_and_difficulty[room_id]['topics']
+
+    to_delete = []
+    for player in user_scores[room_id]:
+        if player not in rooms[room_id]:
+            to_delete.append(player)
+    
+    for p in to_delete:
+        del user_scores[room_id][p]
+        del user_question_status[room_id][p]
+
+    # add question status
+    for player in rooms[room_id]:
+        if player in user_scores[room_id]:
+            user_scores[room_id][player] = 0
+            user_question_status[room_id][player] = []
+            for _ in range(number_of_questions[room_id]):
+                user_question_status[room_id][player].append(0)
+
+
+    questions_generator(easy, med, hard, topics, problem_set)
+    retrieve_room_info()
+
+
+def questions_generator(easy, med, hard, topics, problem_set):
+    user_id = request.sid
+    user = current_users[user_id][1]
+    room_id = current_users[user_id][0]
+
+    global algorithms_problems_json
+
+    algorithms_problems_json = [obj for obj in algorithms_problems_json if not obj['paidOnly']]
+    easy_questions = [obj for obj in algorithms_problems_json if obj['difficulty'] == 'Easy']
+    med_questions = [obj for obj in algorithms_problems_json if obj['difficulty'] == 'Medium']
+    hard_questions = [obj for obj in algorithms_problems_json if obj['difficulty'] == 'Hard']
 
     # Generate random leetcode questions
     easy_question_numbers = []
-    med_question_numbers = []
+    med_question_numbers  = []
     hard_question_numbers = []
-
-    topics = data['topics']   
 
     list_of_question_links = []
     question_title = []
@@ -130,10 +236,10 @@ def create_room(data):
             return 
 
         for question_id in easy_question_numbers:
-                link = 'https://www.leetcode.com/problems/' + easy_questions[question_id]['titleSlug'] + '/'
-                difficulty = 1
-                list_of_question_links.append((link, difficulty))
-                question_title.append(easy_questions[question_id]["title"])
+            link = 'https://www.leetcode.com/problems/' + easy_questions[question_id]['titleSlug'] + '/'
+            difficulty = 1
+            list_of_question_links.append((link, difficulty))
+            question_title.append(easy_questions[question_id]["title"])
 
         # generate med questions
         for question_id in med_question_numbers:
@@ -164,10 +270,10 @@ def create_room(data):
             return 
 
         for question_id in easy_question_numbers:
-                link = 'https://www.leetcode.com/problems/' + algorithms_problems_json[question_id]['titleSlug'] + '/'
-                difficulty = 1
-                list_of_question_links.append((link, difficulty))
-                question_title.append(algorithms_problems_json[question_id]["title"])
+            link = 'https://www.leetcode.com/problems/' + algorithms_problems_json[question_id]['titleSlug'] + '/'
+            difficulty = 1
+            list_of_question_links.append((link, difficulty))
+            question_title.append(algorithms_problems_json[question_id]["title"])
 
         # generate med questions
         for question_id in med_question_numbers:
@@ -202,11 +308,11 @@ def create_room(data):
         med_problems = generate_multiple_topics(possible_med, med)
         hard_problems = generate_multiple_topics(possible_hard, hard)
 
-        print('\n')
-        print(easy_problems)
-        print(med_problems)
-        print(hard_problems)
-        print('\n')
+        # print('\n')
+        # print(easy_problems)
+        # print(med_problems)
+        # print(hard_problems)
+        # print('\n')
 
         for k, v in easy_problems.items():
             easy_question_numbers.extend(generate_questions(k, v, problem_set))
@@ -229,10 +335,10 @@ def create_room(data):
             return 
 
         for question_id in easy_question_numbers:
-                link = 'https://www.leetcode.com/problems/' + algorithms_problems_json[question_id]['titleSlug'] + '/'
-                difficulty = 1
-                list_of_question_links.append((link, difficulty))
-                question_title.append(algorithms_problems_json[question_id]["title"])
+            link = 'https://www.leetcode.com/problems/' + algorithms_problems_json[question_id]['titleSlug'] + '/'
+            difficulty = 1
+            list_of_question_links.append((link, difficulty))
+            question_title.append(algorithms_problems_json[question_id]["title"])
 
         # generate med questions
         for question_id in med_question_numbers:
@@ -247,39 +353,19 @@ def create_room(data):
             difficulty = 3
             list_of_question_links.append((link, difficulty))
             question_title.append(algorithms_problems_json[question_id]["title"])
-        
-    # print(easy_question_numbers)
-    # print(med_question_numbers)
-    # print(hard_question_numbers)
 
-    # list_of_question_links = [
-    #     'https://www.leetcode.com/problems/two-sum/',
-    #     'https://www.leetcode.com/problems/best-time-to-buy-and-sell-stock/',
-    #     'https://www.leetcode.com/problems/contains-duplicate/',
-    #     'https://www.leetcode.com/problems/product-of-array-except-self/'
-    # ]
-    # question_title = ['two sum blush', 'stonks', 'duplicate sadge', 'brain ded on easy question']
-
-    # add question status
-    user_question_status[room_id][data['name']] = []
-    user_scores[room_id][data['name']] = 0
+    user_question_status[room_id][user] = []
+    user_scores[room_id][user] = 0
     room_questions[room_id] = []
+    number_of_questions[room_id] = len(list_of_question_links)
 
     for i in range(number_of_questions[room_id]):
         # (title, links, difficulty)
         room_questions[room_id].append((question_title[i], list_of_question_links[i][0], list_of_question_links[i][1]))
-        user_question_status[room_id][data['name']].append(0)
+        user_question_status[room_id][user].append(0)
 
     print(room_questions)
     print(user_question_status)
-
-    players = rooms[room_id]
-    questions = room_questions[room_id]
-    emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name})
-    socketio.server.enter_room(user_id, room_id)
-
-    print("A new room is successfully created!\nThe list of rooms: ", rooms)
-    messaging({'message': data['name'] + ' just joined the room!', 'type': 'admin'})
 
 def generate_multiple_topics(possible, count):
     problems = defaultdict(int)
@@ -345,67 +431,6 @@ def generate_questions(request, count, type): # request is formatted as "Topic, 
     else:
         return []
 
-@socketio.on('retrieve_room_info')
-def retrieve_room_info():
-    user_id = request.sid
-    print(current_users)
-
-    if user_id in current_users:
-        room_id = current_users[user_id][0]
-        players = rooms[room_id]
-        questions = room_questions[room_id]
-        convo = chat_logs[room_id]
-        room_name = room_name_pairs1[room_id]
-
-        emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name}, room=room_id)
-        emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'chatlog': convo, 'room_name': room_name})
-
-@socketio.on('join_room')
-def join_room(data):
-    user_id = request.sid
-    tmp = data['room_id']
-
-    if not tmp.isdigit():
-        room_name = tmp
-        room_id = room_name_pairs2[room_name]
-    else:
-        room_id = tmp
-        room_name = room_name_pairs1[room_id]
-
-    user = data['name']
-
-    if room_id in rooms:
-        rooms[room_id].append(user)
-        rooms[room_id] = list(set(rooms[room_id]))
-
-        if user_id in current_users and current_users[user_id][0] != room_id:
-            print('test')
-            leave_room()
-        
-        if user_id not in current_users:
-            print('test2')
-            socketio.server.enter_room(user_id, room_id)
-            current_users[user_id] = (room_id, user)
-
-            room_name = room_name_pairs1[room_id]
-
-            players = rooms[room_id]
-            questions = room_questions[room_id]
-            convo = user + ' just joined room ' + room_name + '!'
-
-            messaging({'message': convo, 'type': 'admin'})
-            emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'chatlog': chat_logs[room_id], 'room_name': room_name})
-            emit('room_info', {'players': players}, room=room_id)
-
-            print("New user join room " + room_name + ". The users now are: ", rooms[room_id])
-            print(rooms)
-
-            # add question status
-            if user not in user_scores[room_id]:
-                user_scores[room_id][user] = 0
-                for _ in range(number_of_questions[room_id]):
-                    user_question_status[room_id][user].append(0)
-                print(user_question_status)
 
 @socketio.on('leave_room')
 def leave_room():
@@ -435,8 +460,14 @@ def leave_room():
         del user_question_status[room_id]
         del number_of_questions[room_id]
         del room_questions[room_id]
+        del room_owner[room_id]
+
+        if room_id in room_question_topics_and_difficulty:
+            del room_question_topics_and_difficulty[room_id]
         if room_id in user_scores:
             del user_scores[room_id]
+
+        messaging({'message': user + ' just left the room!', 'type': 'admin', 'include_self': False})
 
     else:
         room_name = room_name_pairs1[room_id]
@@ -448,10 +479,27 @@ def leave_room():
         players = rooms[room_id]
         questions = room_questions[room_id]
         emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name}, room=room_id, include_self=False)
-    
-    messaging({'message': user + ' just left the room!', 'type': 'admin', 'include_self': False})
+
+        # transfer ownership
+        if room_owner[room_id] == user:
+            players = rooms[room_id]
+            random_transfer = random.randint(0, len(players)-1)
+            new_owner = players[random_transfer]
+            room_owner[room_id] = new_owner
+            emit('new_owner', {'name': new_owner}, room=room_id, include_self=False)
+            messaging({'message': user + ' just left the room! The new room owner is ' + new_owner, 'type': 'admin', 'include_self': False})
+        else:
+            messaging({'message': user + ' just left the room!', 'type': 'admin', 'include_self': False})
+
+        print(room_owner)
 
     del current_users[user_id]
+
+    # if user in user_scores[room_id]:
+    #     del user_scores[room_id][user]
+    # if user in user_question_status[room_id]:
+    #     del user_question_status[room_id][user]
+
     # if room_id in user_question_status and user in user_question_status[room_id]:
     #     del user_question_status[room_id][user]
 
