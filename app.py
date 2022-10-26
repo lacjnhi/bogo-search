@@ -541,9 +541,7 @@ def messaging(data):
     include_self = data['include_self'] if 'include_self' in data else True
 
     # get current time
-    t = time.localtime()
-    cur_time = time.strftime('%H:%M', t)
-    print(cur_time)
+    cur_time = time.time()
 
     print(msg)
     user_id = request.sid
