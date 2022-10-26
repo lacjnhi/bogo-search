@@ -169,8 +169,13 @@ def join_room(data):
             convo = user + ' just joined room ' + room_name + '!'
 
             messaging({'message': convo, 'type': 'admin'})
-            messaging({'message': 'Hey ' + user + '👋, round has not started yet! Please wait for the moderator to start this round!', 'type': 'start'})
-            emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'chatlog': chat_logs[room_id], 'room_name': room_name})
+
+            if not room_start[room_id]:
+                messaging({'message': 'Hey ' + user + '👋, round has not started yet! Please wait for the moderator to start this round!', 'type': 'start'})
+            else:
+                messaging({'message': 'Hey ' + user + '👋, round has started! Have fun!', 'type': 'start'})
+
+            emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'chatlog': chat_logs[room_id], 'room_name': room_name, 'is_started': room_start[room_id]})
             emit('room_info', {'players': players}, room=room_id)
 
             print("New user join room " + room_name + ". The users now are: ", rooms[room_id])
