@@ -1,7 +1,7 @@
 from socketserver import UDPServer
 from flask import Flask, request, render_template
 from flask_cors import CORS, cross_origin
-from flask_socketio import SocketIO, emit, send
+from flask_socketio import SocketIO, emit, join_room, leave_room
 from collections import defaultdict
 import requests, json, random
 import time
@@ -16,7 +16,7 @@ def index():
     return render_template('index.html')
 
 rooms = defaultdict(list)           # key: room,    value: list of users
-current_users = defaultdict(tuple)  # key: room id, value: (room id, username)
+current_users = defaultdict(tuple)  # key: username, value: room id
 room_questions = defaultdict(list)  # key: room id, value: list of questions + its title + difficulty
 room_name_pairs1 = defaultdict(str) # key: room id, value: room name
 room_name_pairs2 = defaultdict(str) # key: room name, value: room id
@@ -84,26 +84,27 @@ file.close()
 @socketio.on('create_room')
 def create_room(data):
     # Add user in a room
-    user_id = request.sid
+    # user_id = request.sid
     room_name = data['room_name']
     easy, med, hard = data['difficulties']
+    user = data['name']
 
     if room_name in room_name_pairs2:
         return
 
-    if user_id in current_users:
-        leave_room()
+    if user in current_users:
+        leave({'name': user})
 
     # set up user info
     global room_number
     room_number += 1
     room_id = str(room_number) # request.sid
-    rooms[room_id].append(data['name'])
+    rooms[room_id].append(user)
     rooms[room_id] = list(set(rooms[room_id]))
-    room_owner[room_id] = data['name']
+    room_owner[room_id] = user
     room_name_pairs1[room_id] = room_name
     room_name_pairs2[room_name] = room_id
-    current_users[user_id] = (room_id, data['name'])
+    current_users[user] = room_id
     room_start[room_id] = False
 
     # get from either all questions, blind 75, or neetcode 150
@@ -119,25 +120,26 @@ def create_room(data):
     }
     print(room_question_topics_and_difficulty)
 
-    questions_generator(easy, med, hard, topics, problem_set)
+    questions_generator(easy, med, hard, topics, problem_set, user)
 
     players = rooms[room_id]
     questions = room_questions[room_id]
     emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name, 'is_owner': True})
-    socketio.server.enter_room(user_id, room_id)
+    # socketio.server.enter_room(user_id, room_id)
+    join_room(room_id)
 
     print("A new room is successfully created!\nThe list of rooms: ", rooms)
-    messaging({'message': data['name'] + ' just joined the room!', 'type': 'admin'})
-    messaging({'message': 'Hey ' + data['name'] + '👋, round has not started yet! You can start anytime by clicking the "start" button!', 'type': 'start'})
+    messaging({'message': data['name'] + ' just joined the room!', 'type': 'admin', 'name': user})
+    messaging({'message': 'Hey ' + data['name'] + '👋, round has not started yet! You can start anytime by clicking the "start" button!', 'type': 'start', 'name': user})
 
 @socketio.on('retrieve_room_info')
-def retrieve_room_info():
-    user_id = request.sid
-    print(current_users, user_id, user_id in current_users)
+def retrieve_room_info(data):
+    # user_id = request.sid
+    user = data['name']
+    print(user, current_users, user in current_users)
 
-    if user_id in current_users:
-        room_id = current_users[user_id][0]
-        user = current_users[user_id][1]
+    if user in current_users:
+        room_id = current_users[user]
         players = rooms[room_id]
         questions = room_questions[room_id]
         convo = chat_logs[room_id]
@@ -147,19 +149,19 @@ def retrieve_room_info():
         emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'chatlog': convo, 'room_name': room_name, 'is_owner': room_owner[room_id] == user, 'is_started': room_start[room_id]})
 
 @socketio.on('ready')
-def start_room():
-    user_id = request.sid
-    room_id = current_users[user_id][0]
-
+def start_room(data):
+    # user_id = request.sid
+    user = data['name']
+    room_id = current_users[user]
     room_start[room_id] = True
 
     emit('start', {'timer': 0}, room=room_id)
-    messaging({'message': 'Round has started🏃! Have fun!', 'type': 'start'})
+    messaging({'message': 'Round has started🏃! Have fun!', 'type': 'start', 'name': user})
 
 
 @socketio.on('join_room')
-def join_room(data):
-    user_id = request.sid
+def join(data):
+    # user_id = request.sid
     tmp = data['room_id']
 
     if not tmp.isdigit():
@@ -175,14 +177,14 @@ def join_room(data):
         rooms[room_id].append(user)
         rooms[room_id] = list(set(rooms[room_id]))
 
-        if user_id in current_users and current_users[user_id][0] != room_id:
+        if user in current_users and current_users[user] != room_id:
             print('test')
-            leave_room()
+            leave({'name': user})
         
-        if user_id not in current_users:
-            print('test2')
-            socketio.server.enter_room(user_id, room_id)
-            current_users[user_id] = (room_id, user)
+        if user not in current_users:
+            # socketio.server.enter_room(user_id, room_id)
+            join_room(room_id)
+            current_users[user] = room_id
 
             room_name = room_name_pairs1[room_id]
 
@@ -190,12 +192,12 @@ def join_room(data):
             questions = room_questions[room_id]
             convo = user + ' just joined room ' + room_name + '!'
 
-            messaging({'message': convo, 'type': 'admin'})
+            messaging({'message': convo, 'type': 'admin', 'name': user})
 
             if not room_start[room_id]:
-                messaging({'message': 'Hey ' + user + '👋, round has not started yet! Please wait for the moderator to start this round!', 'type': 'start'})
+                messaging({'message': 'Hey ' + user + '👋, round has not started yet! Please wait for the moderator to start this round!', 'type': 'start', 'name': user})
             else:
-                messaging({'message': 'Hey ' + user + '👋, round has started! Have fun!', 'type': 'start'})
+                messaging({'message': 'Hey ' + user + '👋, round has started! Have fun!', 'type': 'start', 'name': user})
 
             emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'chatlog': chat_logs[room_id], 'room_name': room_name, 'is_started': room_start[room_id]})
             emit('room_info', {'players': players}, room=room_id)
@@ -212,10 +214,10 @@ def join_room(data):
 
 
 @socketio.on('restart')
-def restart():
-    user_id = request.sid
-    room_id = current_users[user_id][0]
-    user = current_users[user_id][1]
+def restart(data):
+    # user_id = request.sid
+    user = data['name']
+    room_id = current_users[user]
     room_start[room_id] = False
 
     room_questions[room_id] = []
@@ -242,15 +244,13 @@ def restart():
             for _ in range(number_of_questions[room_id]):
                 user_question_status[room_id][player].append(0)
 
-    messaging({'message': 'Room stopped 🛑! Waiting for the room moderator to start ⌛...', 'type': 'start'})
+    messaging({'message': 'Room stopped 🛑! Waiting for the room moderator to start ⌛...', 'type': 'start', 'name': user})
 
-    questions_generator(easy, med, hard, topics, problem_set)
-    retrieve_room_info()
+    questions_generator(easy, med, hard, topics, problem_set, user)
+    retrieve_room_info({'name': user})
 
-def questions_generator(easy, med, hard, topics, problem_set):
-    user_id = request.sid
-    user = current_users[user_id][1]
-    room_id = current_users[user_id][0]
+def questions_generator(easy, med, hard, topics, problem_set, user):
+    room_id = current_users[user]
 
     global algorithms_problems_json
 
@@ -536,16 +536,16 @@ def generate_questions(request, count, type): # request is formatted as "Topic, 
 
 
 @socketio.on('leave_room')
-def leave_room():
-    user_id = request.sid
+def leave(data):
+    # user_id = request.sid
+    user = data['name']
 
-    if user_id not in current_users:
+    if user not in current_users:
         print('User not in any room!')
         emit({'message': 'You are not in a room', 'type': 'error'})
         return
 
-    room_id = current_users[user_id][0]
-    user = current_users[user_id][1]
+    room_id = current_users[user]
     print(current_users)
 
     if user in rooms[room_id]:
@@ -571,7 +571,7 @@ def leave_room():
         if room_id in user_scores:
             del user_scores[room_id]
 
-        messaging({'message': user + ' just left the room!', 'type': 'admin', 'include_self': False})
+        messaging({'message': user + ' just left the room!', 'type': 'admin', 'include_self': False, 'name': user})
 
     else:
         room_name = room_name_pairs1[room_id]
@@ -591,13 +591,13 @@ def leave_room():
             new_owner = players[random_transfer]
             room_owner[room_id] = new_owner
             emit('new_owner', {'name': new_owner}, room=room_id, include_self=False)
-            messaging({'message': user + ' just left the room! The new room owner is ' + new_owner, 'type': 'admin', 'include_self': False})
+            messaging({'message': user + ' just left the room! The new room owner is ' + new_owner, 'type': 'admin', 'include_self': False, 'name': user})
         else:
-            messaging({'message': user + ' just left the room!', 'type': 'admin', 'include_self': False})
+            messaging({'message': user + ' just left the room!', 'type': 'admin', 'include_self': False, 'name': user})
 
         print(room_owner)
 
-    del current_users[user_id]
+    del current_users[user]
 
     # if user in user_scores[room_id]:
     #     del user_scores[room_id][user]
@@ -610,7 +610,8 @@ def leave_room():
     # if room_id in user_scores and user in user_scores[room_id]:
     #     del user_scores[room_id][user]
 
-    socketio.server.leave_room(user_id, room_id)
+    # socketio.server.leave_room(user_id, room_id)
+    leave_room(room_id)
 
     print(rooms)
 
@@ -619,19 +620,20 @@ def messaging(data):
     msg = data['message']
     msg_type = data['type'] if 'type' in data else 'chat'
     include_self = data['include_self'] if 'include_self' in data else True
+    user = data['name']
 
     # get current time
     cur_time = time.time()
 
     print(msg)
-    user_id = request.sid
-    if user_id in current_users:
-        room_id = current_users[user_id][0]
-        user = current_users[user_id][1]
+    print(user, current_users)
+    # user_id = request.sid
+    if user in current_users:
+        room_id = current_users[user]
 
         room_name = room_name_pairs1[room_id]
 
-        tmp = {'message': msg, 'user': user_id, 'name': user, 'type': msg_type, 'room_name': room_name, 'time': cur_time}
+        tmp = {'message': msg, 'name': user, 'type': msg_type, 'room_name': room_name, 'time': cur_time}
         chat_logs[room_id].append(tmp)
 
         print('Received message from ' + user + ': ' + msg + ' in room ' + room_name)
@@ -645,30 +647,30 @@ user_question_status = defaultdict(lambda: defaultdict(list)) # key: roomid valu
 
 @socketio.on('submission')
 def send_submission(data):
-    user_id = request.sid
+    # user_id = request.sid
     submission_status = data['status_msg']
     id = data['curr_id']
     difficulty = data['difficulty']
+    user = data['name']
 
     msg = ''
 
-    if user_id in current_users:
-        user = current_users[user_id][1]
-        room_id = current_users[user_id][0]
+    if user in current_users:
+        room_id = current_users[user]
 
         if submission_status != 'Accepted':
             if submission_status == 'Wrong Answer' or submission_status == 'Runtime Error':
-                msg = current_users[user_id][1] + ' submitted question ' + str(id+1) + '. Error: Code is wrong, do better.'
+                msg = user + ' submitted question ' + str(id+1) + '. Error: Code is wrong, do better.'
             elif submission_status == 'Compile Error':
-                msg = current_users[user_id][1] + ' submitted question ' + str(id+1) + '. Error: Code cannot be compiled, do better.'
+                msg = user + ' submitted question ' + str(id+1) + '. Error: Code cannot be compiled, do better.'
             elif submission_status == 'Time Limit Exceeded':
-                msg = current_users[user_id][1] + ' submitted question ' + str(id+1) + '. Error: Time Limit Exceeded. Your code runs slower than my grandma, do better.'
+                msg = user + ' submitted question ' + str(id+1) + '. Error: Time Limit Exceeded. Your code runs slower than my grandma, do better.'
             else:
-                msg = current_users[user_id][1] + ' submitted question ' + str(id+1) + '!'
+                msg = user + ' submitted question ' + str(id+1) + '!'
 
             # set status to 1: started but unsuccessful
             user_question_status[room_id][user][id] = 1
-            messaging({'message': msg, 'type': 'submission'})
+            messaging({'message': msg, 'type': 'submission', 'name': user})
         elif user_question_status[room_id][user][id] != 2:
             percentile = data['runtime_percentile']
             language = data['pretty_lang']
@@ -677,20 +679,21 @@ def send_submission(data):
             user_question_status[room_id][user][id] = 2
 
             msg = user + ' completed the problem ' + str(id+1) + ' in ' + language + ', beat ' + str(round(percentile, 2)) + '% of users!'
-            messaging({'message': msg, 'type': 'submission'})
+            messaging({'message': msg, 'type': 'submission', 'name': user})
             user_scores[room_id][user] += difficulty
 
             # user successfully solved every problems
             if len(set(user_question_status[room_id][user])) == 1 and list(set(user_question_status[room_id][user]))[0] == 2:
                 msg = user + ' finished the contest!'
-                messaging({'message': msg, 'type': 'submission'})
+                messaging({'message': msg, 'type': 'submission', 'name': user})
 
 @socketio.on('leaderboard')
-def get_rankings():
+def get_rankings(data):
     # return users, their question statuses and rankings
-    user_id = request.sid 
-    if user_id in current_users:
-        room_id = current_users[user_id][0]
+    # user_id = request.sid 
+    user = data['name']
+    if user in current_users:
+        room_id = current_users[user]
 
         rankings = user_scores[room_id]
         rankings = sorted(rankings.items(), key=lambda i: i[1], reverse=True)
