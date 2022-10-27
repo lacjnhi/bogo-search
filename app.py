@@ -534,6 +534,20 @@ def generate_questions(request, count, type): # request is formatted as "Topic, 
     else:
         return []
 
+@socketio.on('reconnect')
+def reconnect(data):
+    user = data['name']
+    print('\n')
+    print('======TEST RECONNECT======')
+    
+    if user in current_users:
+        room_id = current_users[user]
+        join_room(room_id)
+        print('reconnected! joined a room user is suppossed to be in')
+    else:
+        print('not in a room to reconnect')
+
+    print('\n')
 
 @socketio.on('leave_room')
 def leave(data):
