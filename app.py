@@ -547,9 +547,9 @@ def reconnect(data):
     if user in current_users:
         room_id = current_users[user]
         join_room(room_id)
-        print('reconnected! joined a room user is suppossed to be in')
+        print(user + ' reconnected! joined a room user is suppossed to be in')
     else:
-        print('not in a room to reconnect')
+        print(user + ' not in a room to reconnect')
 
     print('\n')
 
