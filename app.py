@@ -565,7 +565,7 @@ def leave(data):
     if user in rooms[room_id]:
         rooms[room_id].remove(user)
 
-    if len(rooms[room_id]) == 0:
+    if len(rooms[room_id]) == 0 and room_name_pairs1[room_id] != 'beta-test':
         print("Room is terminated!")
         if room_id in chat_logs:
             del chat_logs[room_id]
