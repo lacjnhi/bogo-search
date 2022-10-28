@@ -212,7 +212,7 @@ def join(data):
                     user_question_status[room_id][user].append(0)
                 print(user_question_status)
 
-        if len(rooms[room_id]) == 0:
+        if len(rooms[room_id]) == 1:
             room_owner[room_id] = user
             emit('room_info', {'is_owner': True})
             
