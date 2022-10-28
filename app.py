@@ -214,6 +214,7 @@ def join(data):
 
         if len(rooms[room_id]) == 0:
             room_owner[room_id] = user
+            emit('room_info', {'is_owner': True})
             
 
 @socketio.on('restart')
