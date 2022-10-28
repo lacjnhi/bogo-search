@@ -603,7 +603,7 @@ def leave(data):
         emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name}, room=room_id, include_self=False)
 
         # transfer ownership
-        if room_owner[room_id] == user and room_name_pairs1[room_id] != 'beta-test':
+        if room_owner[room_id] == user and len(rooms[room_id]) != 0:
             players = rooms[room_id]
             random_transfer = random.randint(0, len(players)-1)
             new_owner = players[random_transfer]
