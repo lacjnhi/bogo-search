@@ -1,5 +1,6 @@
 FROM tiangolo/uwsgi-nginx-flask:python3.8-alpine
 RUN apk add g++
+RUN apk add make
 RUN apk add linux-headers
 RUN apk add libc-dev
 RUN apk add musl-dev
