@@ -4,10 +4,6 @@ on:
   push:
     branches: [ "main" ]
 
-env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY: leetcode-rooms
-
 jobs:
 
   build:
