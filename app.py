@@ -678,11 +678,11 @@ def send_submission(data):
 
         if submission_status != 'Accepted':
             if submission_status == 'Wrong Answer' or submission_status == 'Runtime Error':
-                msg = user + ' submitted question ' + str(id+1) + '. Error: Code is wrong, do better.'
+                msg = user + ' submitted question ' + str(id+1) + '. Error: Code is wrong.'
             elif submission_status == 'Compile Error':
-                msg = user + ' submitted question ' + str(id+1) + '. Error: Code cannot be compiled, do better.'
+                msg = user + ' submitted question ' + str(id+1) + '. Error: Code cannot be compiled.'
             elif submission_status == 'Time Limit Exceeded':
-                msg = user + ' submitted question ' + str(id+1) + '. Error: Time Limit Exceeded. Your code runs slower than my grandma, do better.'
+                msg = user + ' submitted question ' + str(id+1) + '. Error: Time Limit Exceeded.'
             else:
                 msg = user + ' submitted question ' + str(id+1) + '!'
 
