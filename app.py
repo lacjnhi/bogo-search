@@ -686,8 +686,10 @@ def send_submission(data):
             else:
                 msg = user + ' submitted question ' + str(id+1) + '!'
 
-            # set status to 1: started but unsuccessful
-            user_question_status[room_id][user][id] = 1
+            if user_question_status[room_id][user][id] != 2: 
+                # set status to 1: started but unsuccessful
+                user_question_status[room_id][user][id] = 1
+
             messaging({'message': msg, 'type': 'submission', 'name': user})
         elif user_question_status[room_id][user][id] != 2:
             percentile = data['runtime_percentile']
@@ -696,7 +698,7 @@ def send_submission(data):
             # set status to 2: successfully solved
             user_question_status[room_id][user][id] = 2
 
-            msg = user + ' completed the problem ' + str(id+1) + ' in ' + language + ', beat ' + str(round(percentile, 2)) + '% of users!'
+            msg = user + ' completed problem ' + str(id+1) + ' in ' + language + ', beat ' + str(round(percentile, 2)) + '% of users!'
             messaging({'message': msg, 'type': 'submission', 'name': user})
             user_scores[room_id][user] += difficulty
 

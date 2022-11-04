@@ -7,7 +7,8 @@ m = {}
 id = []
 
 for i, question in enumerate(questions):
-    m[question["titleSlug"]] = i
-print(id)
-json.dump(m, open('title_to_id.json', 'w'))
+    m[question["titleSlug"]] = (question["title"], question["difficulty"])
+
+# print(id)
+json.dump(m, open('data/questions_titleSlug_mappings.json', 'w'))
 
