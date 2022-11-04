@@ -707,7 +707,7 @@ def send_submission(data):
                     msg = user + ' finished the contest!'
                     messaging({'message': msg, 'type': 'submission', 'name': user})
             else:
-                msg = user + ' resubmitted problem ' + str(id+1) + ' in ' + language + ', beat ' + str(round(percentile, 2)) + '% of users!'
+                msg = user + ' resubmitted and completed problem ' + str(id+1) + ' in ' + language + ', beat ' + str(round(percentile, 2)) + '% of users!'
                 messaging({'message': msg, 'type': 'submission', 'name': user})
 
 @socketio.on('leaderboard')
