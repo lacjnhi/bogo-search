@@ -89,6 +89,8 @@ def create_room(data):
     easy, med, hard = data['difficulties']
     user = data['name']
 
+    prechosen_questions = data['questions']
+
     if room_name in room_name_pairs2:
         return
 
@@ -120,7 +122,38 @@ def create_room(data):
     }
     print(room_question_topics_and_difficulty)
 
-    questions_generator(easy, med, hard, topics, problem_set, user)
+    if not prechosen_questions:
+        questions_generator(easy, med, hard, topics, problem_set, user)
+    else:
+        file = open('data/questions_titleSlug_mappings.json')
+        title_slug_map = json.load(file)
+        file.close()
+
+        diff = {
+            "Easy": 1,
+            "Medium": 2,
+            "Hard": 3
+        }
+
+        question_details = []
+        for q in prechosen_questions:
+            link = 'https://www.leetcode.com/problems/' + q + '/'
+            difficulty = diff[title_slug_map[q][1]]
+            title = title_slug_map[q][0]
+            question_details.append((link, difficulty, title))
+
+        user_question_status[room_id][user] = []
+        user_scores[room_id][user] = 0
+        room_questions[room_id] = []
+        number_of_questions[room_id] = len(prechosen_questions)
+
+        for i in range(number_of_questions[room_id]):
+            # title, links, difficulty
+            room_questions[room_id].append((question_details[i][2], question_details[i][0], question_details[i][1]))
+            user_question_status[room_id][user].append(0)
+
+        print(room_questions[room_id])
+        print(user_question_status[room_id])
 
     players = rooms[room_id]
     questions = room_questions[room_id]
@@ -443,8 +476,8 @@ def questions_generator(easy, med, hard, topics, problem_set, user):
         room_questions[room_id].append((question_title[i], list_of_question_links[i][0], list_of_question_links[i][1]))
         user_question_status[room_id][user].append(0)
 
-    print(room_questions)
-    print(user_question_status)
+    print(room_questions[room_id])
+    print(user_question_status[room_id])
 
 def generate_questions_no_topics(count, level, type):
     questions_id = []
@@ -497,6 +530,7 @@ def generate_multiple_topics(possible, count):
 
 file = open('data/lc_topics.json')
 question_topic_difficulty = json.load(file)
+file.close()
 def generate_questions(request, count, type): # request is formatted as "Topic, Diff"
     if request in question_topic_difficulty:
         question_list = question_topic_difficulty[request]
