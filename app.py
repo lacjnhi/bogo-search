@@ -2,7 +2,7 @@ from socketserver import UDPServer
 from flask import Flask, request, render_template
 from flask_cors import CORS, cross_origin
 from flask_socketio import SocketIO, emit, join_room, leave_room
-from collections import defaultdict
+from collections import defaultdict, deque
 import requests, json, random
 import time
 
@@ -23,7 +23,8 @@ room_name_pairs2 = defaultdict(str) # key: room name, value: room id
 chat_logs = defaultdict(list)       # key: room id, value: list of messages
 room_owner = defaultdict(str)       # key: room id, value: owner of the room
 room_question_topics_and_difficulty = defaultdict(object) # key: roomid, value: list of possible pairs of questions
-room_start = defaultdict(bool)       # key: room id, 
+room_start = defaultdict(bool)      # key: room id, start yet or not
+room_timer = defaultdict(int)       # key: room id, timer
 
 room_number = 0
 
@@ -80,6 +81,10 @@ for title in neetcode150_problems_list:
 # print(neetcode_id)
 file.close()
 
+file = open('data/questions_titleSlug_mappings.json')
+title_slug_map = json.load(file)
+file.close()
+
 # LEETCODE_URL = "https://leetcode.com/api/problems/algorithms/"
 @socketio.on('create_room')
 def create_room(data):
@@ -89,6 +94,9 @@ def create_room(data):
     easy, med, hard = data['difficulties']
     user = data['name']
 
+    # calculate time needed based on the number of difficulties
+    contest_time = easy * 15 * 60 + med * 30 * 60 + hard * 60 * 60
+    room_timer[room_id] = contest_time
     prechosen_questions = data['questions']
 
     if room_name in room_name_pairs2:
@@ -114,20 +122,79 @@ def create_room(data):
     topics = data['topics']   
 
     room_question_topics_and_difficulty[room_id] = {
+        'room_name': room_name,
         'easy': easy,
         'med': med,
         'hard': hard,
         'problemset': problem_set,
-        'topics': topics
+        'topics': topics,
+        'questions': prechosen_questions
     }
-    print(room_question_topics_and_difficulty)
+    print(room_question_topics_and_difficulty[room_id])
+
+    players = rooms[room_id]
+    emit('room_info', {'room_id': room_id, 'players': players, 'room_name': room_name, 'is_owner': True})
+    # socketio.server.enter_room(user_id, room_id)
+    join_room(room_id)
+
+    print("A new room is successfully created!\nThe list of rooms: ", rooms)
+    messaging({'message': data['name'] + ' just joined the room!', 'type': 'admin', 'name': user})
+    messaging({'message': 'Hey ' + data['name'] + '👋, round has not started yet! You can start anytime by clicking the "start" button!', 'type': 'start', 'name': user})
+
+@socketio.on('retrieve_room_info')
+def retrieve_room_info(data):
+    # user_id = request.sid
+    user = data['name']
+    print(user, current_users, user in current_users)
+
+    if user in current_users:
+        room_id = current_users[user]
+        players = rooms[room_id]
+        questions = room_questions[room_id]
+        convo = chat_logs[room_id]
+        room_name = room_name_pairs1[room_id]
+
+        emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name, 'is_started': room_start[room_id]}, room=room_id)
+        emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'chatlog': convo, 'room_name': room_name, 'is_owner': room_owner[room_id] == user, 'is_started': room_start[room_id]})
+
+
+timer_order = deque()
+@socketio.on('ready')
+def start_room(data):
+    # user_id = request.sid
+    user = data['name']
+    room_id = current_users[user]
+    room_start[room_id] = True
+    timer_order.append((room_timer[room_id] + time.time(), room_id))
+
+    to_delete = []
+    for player in user_scores[room_id]:
+        if player not in rooms[room_id]:
+            to_delete.append(player)
+    
+    for p in to_delete:
+        del user_scores[room_id][p]
+        del user_question_status[room_id][p]
+
+    # add question status
+    for player in rooms[room_id]:
+        if player in user_scores[room_id]:
+            user_scores[room_id][player] = 0
+            user_question_status[room_id][player] = []
+            for _ in range(number_of_questions[room_id]):
+                user_question_status[room_id][player].append(0)
+
+    prechosen_questions = room_question_topics_and_difficulty[room_id]["questions"]
+    easy                = room_question_topics_and_difficulty[room_id]["easy"]
+    med                 = room_question_topics_and_difficulty[room_id]["med"]
+    hard                = room_question_topics_and_difficulty[room_id]["hard"]
+    topics              = room_question_topics_and_difficulty[room_id]["topics"]
+    problem_set         = room_question_topics_and_difficulty[room_id]["problemset"]
+    room_name           = room_question_topics_and_difficulty[room_id]["room_name"]
 
     if not prechosen_questions:
         questions_generator(easy, med, hard, topics, problem_set, user)
-    else:
-        file = open('data/questions_titleSlug_mappings.json')
-        title_slug_map = json.load(file)
-        file.close()
+    else:   
 
         diff = {
             "Easy": 1,
@@ -159,40 +226,19 @@ def create_room(data):
 
     players = rooms[room_id]
     questions = room_questions[room_id]
-    emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name, 'is_owner': True})
-    # socketio.server.enter_room(user_id, room_id)
-    join_room(room_id)
-
-    print("A new room is successfully created!\nThe list of rooms: ", rooms)
-    messaging({'message': data['name'] + ' just joined the room!', 'type': 'admin', 'name': user})
-    messaging({'message': 'Hey ' + data['name'] + '👋, round has not started yet! You can start anytime by clicking the "start" button!', 'type': 'start', 'name': user})
-
-@socketio.on('retrieve_room_info')
-def retrieve_room_info(data):
-    # user_id = request.sid
-    user = data['name']
-    print(user, current_users, user in current_users)
-
-    if user in current_users:
-        room_id = current_users[user]
-        players = rooms[room_id]
-        questions = room_questions[room_id]
-        convo = chat_logs[room_id]
-        room_name = room_name_pairs1[room_id]
-
-        emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name, 'is_started': room_start[room_id]}, room=room_id)
-        emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'chatlog': convo, 'room_name': room_name, 'is_owner': room_owner[room_id] == user, 'is_started': room_start[room_id]})
-
-@socketio.on('ready')
-def start_room(data):
-    # user_id = request.sid
-    user = data['name']
-    room_id = current_users[user]
-    room_start[room_id] = True
-
-    emit('start', {'timer': 0}, room=room_id)
+    emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name, 'is_owner': True, 'timer': room_timer[room_id]}, room=room_id)
     messaging({'message': 'Round has started🏃! Have fun!', 'type': 'start', 'name': user})
 
+# def background_thread():
+
+#     while True:
+#         time.sleep(10)
+#         t = time.time()
+#         while timer_order and t >= timer_order[0][0]:
+#             room_id = timer_order[0][1]
+#             timer_order.popleft()
+#             room_start[room_id] = False
+#             socketio.emit('stop_room', {}) 
 
 @socketio.on('join_room')
 def join(data):
@@ -259,33 +305,7 @@ def restart(data):
     room_id = current_users[user]
     room_start[room_id] = False
 
-    room_questions[room_id] = []
-    easy = room_question_topics_and_difficulty[room_id]['easy']
-    med = room_question_topics_and_difficulty[room_id]['med']
-    hard = room_question_topics_and_difficulty[room_id]['hard']
-    problem_set = room_question_topics_and_difficulty[room_id]['problemset']
-    topics = room_question_topics_and_difficulty[room_id]['topics']
-
-    to_delete = []
-    for player in user_scores[room_id]:
-        if player not in rooms[room_id]:
-            to_delete.append(player)
-    
-    for p in to_delete:
-        del user_scores[room_id][p]
-        del user_question_status[room_id][p]
-
-    # add question status
-    for player in rooms[room_id]:
-        if player in user_scores[room_id]:
-            user_scores[room_id][player] = 0
-            user_question_status[room_id][player] = []
-            for _ in range(number_of_questions[room_id]):
-                user_question_status[room_id][player].append(0)
-
     messaging({'message': 'Room stopped 🛑! Waiting for the room moderator to start ⌛...', 'type': 'start', 'name': user})
-
-    questions_generator(easy, med, hard, topics, problem_set, user)
     retrieve_room_info({'name': user})
 
 def questions_generator(easy, med, hard, topics, problem_set, user):
