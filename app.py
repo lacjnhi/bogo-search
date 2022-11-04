@@ -5,15 +5,14 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from collections import defaultdict, deque
 import requests, json, random
 import time
+from math import floor
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'test'
 socketio = SocketIO(app, cors_allowed_origins='*')
 CORS(app)
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+thread = None
 
 rooms = defaultdict(list)           # key: room,    value: list of users
 current_users = defaultdict(tuple)  # key: username, value: room id
@@ -25,11 +24,36 @@ room_owner = defaultdict(str)       # key: room id, value: owner of the room
 room_question_topics_and_difficulty = defaultdict(object) # key: roomid, value: list of possible pairs of questions
 room_start = defaultdict(bool)      # key: room id, start yet or not
 room_timer = defaultdict(int)       # key: room id, timer
+room_start_time = defaultdict(int)  # key: room id, start time
 
 room_number = 0
 
 user_scores = defaultdict(lambda: defaultdict(int)) # key: room_id value: {key: user value: score} 
+user_question_status = defaultdict(lambda: defaultdict(list)) # key: roomid value: {key: username value: status 0/1/2}
+# 0: not started
+# 1: started but unsuccessful
+# 2: successfully solved
+
 number_of_questions = defaultdict(int) # key: roomid value: number of questions
+
+timer_order = deque()
+def background_thread():
+    print("===TIMER STARTED!===")
+    while True:
+        socketio.sleep(1)
+        t = time.time()
+
+        print('\n===TIMER TEST===')
+        print(t, timer_order)
+        while timer_order and t >= timer_order[0][0]:
+            room_id = timer_order[0][1]
+            timer_order.popleft()
+            room_start[room_id] = False
+            socketio.emit('message', {'message': 'Timer ended 🛑! Waiting for the room moderator to start ⌛...', 'type': 'start', 'time': t}, room=room_id)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 file = open('data/lc_questions.json')
 algorithms_problems_json = json.load(file)
@@ -94,11 +118,6 @@ def create_room(data):
     easy, med, hard = data['difficulties']
     user = data['name']
 
-    # calculate time needed based on the number of difficulties
-    contest_time = easy * 15 * 60 + med * 30 * 60 + hard * 60 * 60
-    room_timer[room_id] = contest_time
-    prechosen_questions = data['questions']
-
     if room_name in room_name_pairs2:
         return
 
@@ -117,6 +136,8 @@ def create_room(data):
     current_users[user] = room_id
     room_start[room_id] = False
 
+    prechosen_questions = data['questions']
+
     # get from either all questions, blind 75, or neetcode 150
     problem_set = data['problemset']
     topics = data['topics']   
@@ -133,7 +154,8 @@ def create_room(data):
     print(room_question_topics_and_difficulty[room_id])
 
     players = rooms[room_id]
-    emit('room_info', {'room_id': room_id, 'players': players, 'room_name': room_name, 'is_owner': True})
+    emit('room_info', {'room_id': room_id, 'players': players, 'room_name': room_name, 'is_owner': True, 'questions': []})
+    emit('leaderboard', {'room_id': room_id, 'rankings': [], 'question_status': []})
     # socketio.server.enter_room(user_id, room_id)
     join_room(room_id)
 
@@ -144,8 +166,11 @@ def create_room(data):
 @socketio.on('retrieve_room_info')
 def retrieve_room_info(data):
     # user_id = request.sid
+    global thread
     user = data['name']
-    print(user, current_users, user in current_users)
+
+    if not thread:
+        thread = socketio.start_background_task(background_thread)
 
     if user in current_users:
         room_id = current_users[user]
@@ -154,18 +179,17 @@ def retrieve_room_info(data):
         convo = chat_logs[room_id]
         room_name = room_name_pairs1[room_id]
 
-        emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name, 'is_started': room_start[room_id]}, room=room_id)
+        emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name, 'is_started': room_start[room_id], 'timer': max(0, floor(room_timer[room_id] + room_start_time[room_id] - time.time()))}, room=room_id)
         emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'chatlog': convo, 'room_name': room_name, 'is_owner': room_owner[room_id] == user, 'is_started': room_start[room_id]})
 
 
-timer_order = deque()
 @socketio.on('ready')
 def start_room(data):
     # user_id = request.sid
     user = data['name']
     room_id = current_users[user]
     room_start[room_id] = True
-    timer_order.append((room_timer[room_id] + time.time(), room_id))
+    room_start_time[room_id] = time.time()
 
     to_delete = []
     for player in user_scores[room_id]:
@@ -175,14 +199,6 @@ def start_room(data):
     for p in to_delete:
         del user_scores[room_id][p]
         del user_question_status[room_id][p]
-
-    # add question status
-    for player in rooms[room_id]:
-        if player in user_scores[room_id]:
-            user_scores[room_id][player] = 0
-            user_question_status[room_id][player] = []
-            for _ in range(number_of_questions[room_id]):
-                user_question_status[room_id][player].append(0)
 
     prechosen_questions = room_question_topics_and_difficulty[room_id]["questions"]
     easy                = room_question_topics_and_difficulty[room_id]["easy"]
@@ -202,12 +218,30 @@ def start_room(data):
             "Hard": 3
         }
 
+        easy = 0
+        med = 0
+        hard = 0
+
         question_details = []
         for q in prechosen_questions:
             link = 'https://www.leetcode.com/problems/' + q + '/'
             difficulty = diff[title_slug_map[q][1]]
+
+            if difficulty == 1:
+                easy += 1
+            elif difficulty == 2:
+                med += 1
+            else:
+                hard += 1
+
             title = title_slug_map[q][0]
             question_details.append((link, difficulty, title))
+
+        # calculate time needed based on the number of difficulties
+        contest_time = easy * 15 * 60 + med * 30 * 60 + hard * 60 * 60
+        print('\n===CONTEST TIME===')
+        print(contest_time)
+        room_timer[room_id] = contest_time
 
         user_question_status[room_id][user] = []
         user_scores[room_id][user] = 0
@@ -219,27 +253,26 @@ def start_room(data):
         for i in range(number_of_questions[room_id]):
             # title, links, difficulty
             room_questions[room_id].append((question_details[i][2], question_details[i][0], question_details[i][1]))
-            user_question_status[room_id][user].append(0)
+        
+        # add question status
+        for player in rooms[room_id]:
+            if player in user_scores[room_id]:
+                user_scores[room_id][player] = 0
+                user_question_status[room_id][player] = []
+                for _ in range(number_of_questions[room_id]):
+                    user_question_status[room_id][player].append([0,0])
 
+        print('\n===ROOM INFO - QUESTIONS AND STATUS===')
         print(room_questions[room_id])
         print(user_question_status[room_id])
 
+    timer_order.append((room_timer[room_id] + time.time(), room_id))
     players = rooms[room_id]
     questions = room_questions[room_id]
-    emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name, 'is_owner': True, 'timer': room_timer[room_id]}, room=room_id)
+    emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name, 'is_owner': True, 'timer': room_timer[room_id], 'is_started': True})
+    emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name, 'timer': room_timer[room_id], 'is_started': True}, room=room_id, include_self=False)
     messaging({'message': 'Round has started🏃! Have fun!', 'type': 'start', 'name': user})
-
-# def background_thread():
-
-#     while True:
-#         time.sleep(10)
-#         t = time.time()
-#         while timer_order and t >= timer_order[0][0]:
-#             room_id = timer_order[0][1]
-#             timer_order.popleft()
-#             room_start[room_id] = False
-#             socketio.emit('stop_room', {}) 
-
+            
 @socketio.on('join_room')
 def join(data):
     # user_id = request.sid
@@ -281,7 +314,8 @@ def join(data):
                 messaging({'message': 'Hey ' + user + '👋, round has started! Have fun!', 'type': 'start', 'name': user})
 
             emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'chatlog': chat_logs[room_id], 'room_name': room_name, 'is_started': room_start[room_id]})
-            emit('room_info', {'players': players}, room=room_id)
+            emit('room_info', {'players': players, 'timer': max(0, floor(room_timer[room_id] + room_start_time[room_id] - time.time()))}, room=room_id)
+            emit('leaderboard', {'room_id': room_id, 'rankings': [], 'question_status': []})
 
             print("New user join room " + room_name + ". The users now are: ", rooms[room_id])
             print(rooms)
@@ -290,7 +324,7 @@ def join(data):
             if user not in user_scores[room_id]:
                 user_scores[room_id][user] = 0
                 for _ in range(number_of_questions[room_id]):
-                    user_question_status[room_id][user].append(0)
+                    user_question_status[room_id][user].append([0,0])
                 print(user_question_status)
 
         if len(rooms[room_id]) == 1:
@@ -306,7 +340,7 @@ def restart(data):
     room_start[room_id] = False
 
     messaging({'message': 'Room stopped 🛑! Waiting for the room moderator to start ⌛...', 'type': 'start', 'name': user})
-    retrieve_room_info({'name': user})
+    # retrieve_room_info({'name': user})
 
 def questions_generator(easy, med, hard, topics, problem_set, user):
     room_id = current_users[user]
@@ -493,10 +527,16 @@ def questions_generator(easy, med, hard, topics, problem_set, user):
     room_questions[room_id] = []
     number_of_questions[room_id] = len(list_of_question_links)
 
+    # calculate time needed based on the number of difficulties
+    contest_time = len(easy_question_numbers) * 15 * 60 + len(med_question_numbers) * 30 * 60 + len(hard_question_numbers) * 60 * 60
+    print('\n===CONTEST TIME===')
+    print(contest_time)
+    room_timer[room_id] = contest_time
+
     for i in range(number_of_questions[room_id]):
         # (title, links, difficulty)
         room_questions[room_id].append((question_title[i], list_of_question_links[i][0], list_of_question_links[i][1]))
-        user_question_status[room_id][user].append(0)
+        user_question_status[room_id][user].append([0,0])
 
     print(room_questions[room_id])
     print(user_question_status[room_id])
@@ -627,18 +667,32 @@ def leave(data):
 
     if len(rooms[room_id]) == 0 and room_name_pairs1[room_id] != 'beta-test':
         print("Room is terminated!")
+
         if room_id in chat_logs:
             del chat_logs[room_id]
         del rooms[room_id]
 
         room_name = room_name_pairs1[room_id]
         del room_name_pairs1[room_id]
-        del room_name_pairs2[room_name]
-        del user_question_status[room_id]
-        del number_of_questions[room_id]
-        del room_questions[room_id]
+        if room_name in room_name_pairs2:   
+            del room_name_pairs2[room_name]
+
+        if room_id in user_question_status:
+            del user_question_status[room_id]
+
+        if room_id in number_of_questions:
+            del number_of_questions[room_id]
+
+        if room_id in room_questions:
+            del room_questions[room_id]
         del room_owner[room_id]
-        del room_start[room_id]
+
+        if room_id in room_start:
+            del room_start[room_id]
+        if room_id in room_timer:
+            del room_timer[room_id]
+        if room_id in room_start_time:
+            del room_start_time[room_id]
 
         if room_id in room_question_topics_and_difficulty:
             del room_question_topics_and_difficulty[room_id]
@@ -713,12 +767,6 @@ def messaging(data):
         print('Received message from ' + user + ': ' + msg + ' in room ' + room_name)
         emit('message', tmp, room=room_id, include_self=include_self)
 
-
-user_question_status = defaultdict(lambda: defaultdict(list)) # key: roomid value: {key: username value: status 0/1/2}
-# 0: not started
-# 1: started but unsuccessful
-# 2: successfully solved
-
 @socketio.on('submission')
 def send_submission(data):
     # user_id = request.sid
@@ -742,24 +790,27 @@ def send_submission(data):
             else:
                 msg = user + ' submitted question ' + str(id+1) + '!'
 
-            if user_question_status[room_id][user][id] != 2: 
+            if user_question_status[room_id][user][id][0] != 2: 
                 # set status to 1: started but unsuccessful
-                user_question_status[room_id][user][id] = 1
+                user_question_status[room_id][user][id][0] = 1
 
             messaging({'message': msg, 'type': 'submission', 'name': user})
         else:
             percentile = data['runtime_percentile']
             language = data['pretty_lang']
-            if user_question_status[room_id][user][id] != 2:
+            if user_question_status[room_id][user][id][0] != 2:
                 # set status to 2: successfully solved
-                user_question_status[room_id][user][id] = 2
+                user_question_status[room_id][user][id][0] = 2
+                user_question_status[room_id][user][id][1] = time.time() - room_start_time[room_id]
 
                 msg = user + ' completed problem ' + str(id+1) + ' in ' + language + ', beat ' + str(round(percentile, 2)) + '% of users!'
                 messaging({'message': msg, 'type': 'submission', 'name': user})
                 user_scores[room_id][user] += difficulty
 
                 # user successfully solved every problems
-                if len(set(user_question_status[room_id][user])) == 1 and list(set(user_question_status[room_id][user]))[0] == 2:
+                status = [s[0] for s in user_question_status[room_id][user]]
+
+                if len(set(status)) == 1 and list(set(status))[0] == 2:
                     msg = user + ' finished the contest!'
                     messaging({'message': msg, 'type': 'submission', 'name': user})
             else:
@@ -771,6 +822,7 @@ def get_rankings(data):
     # return users, their question statuses and rankings
     # user_id = request.sid 
     user = data['name']
+    print(user, current_users)
     if user in current_users:
         room_id = current_users[user]
 
@@ -781,6 +833,7 @@ def get_rankings(data):
             print('\nRoom ' + room_id + ' current rankings:')
             print(str(i+1) + '. ' + value[0] + ' with the score of ' + str(value[1]))
 
+        print('\n===RANKINGS===')
         print(rankings)
         print(user_question_status[room_id])
         emit('leaderboard', {'room_id': room_id, 'rankings': rankings, 'question_status': user_question_status[room_id]})
