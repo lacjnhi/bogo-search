@@ -147,6 +147,8 @@ def create_room(data):
         room_questions[room_id] = []
         number_of_questions[room_id] = len(prechosen_questions)
 
+        question_details = sorted(question_details, key=lambda i: i[1])
+
         for i in range(number_of_questions[room_id]):
             # title, links, difficulty
             room_questions[room_id].append((question_details[i][2], question_details[i][0], question_details[i][1]))
