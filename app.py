@@ -691,20 +691,23 @@ def send_submission(data):
                 user_question_status[room_id][user][id] = 1
 
             messaging({'message': msg, 'type': 'submission', 'name': user})
-        elif user_question_status[room_id][user][id] != 2:
+        else:
             percentile = data['runtime_percentile']
             language = data['pretty_lang']
+            if user_question_status[room_id][user][id] != 2:
+                # set status to 2: successfully solved
+                user_question_status[room_id][user][id] = 2
 
-            # set status to 2: successfully solved
-            user_question_status[room_id][user][id] = 2
+                msg = user + ' completed problem ' + str(id+1) + ' in ' + language + ', beat ' + str(round(percentile, 2)) + '% of users!'
+                messaging({'message': msg, 'type': 'submission', 'name': user})
+                user_scores[room_id][user] += difficulty
 
-            msg = user + ' completed problem ' + str(id+1) + ' in ' + language + ', beat ' + str(round(percentile, 2)) + '% of users!'
-            messaging({'message': msg, 'type': 'submission', 'name': user})
-            user_scores[room_id][user] += difficulty
-
-            # user successfully solved every problems
-            if len(set(user_question_status[room_id][user])) == 1 and list(set(user_question_status[room_id][user]))[0] == 2:
-                msg = user + ' finished the contest!'
+                # user successfully solved every problems
+                if len(set(user_question_status[room_id][user])) == 1 and list(set(user_question_status[room_id][user]))[0] == 2:
+                    msg = user + ' finished the contest!'
+                    messaging({'message': msg, 'type': 'submission', 'name': user})
+            else:
+                msg = user + ' resubmitted problem ' + str(id+1) + ' in ' + language + ', beat ' + str(round(percentile, 2)) + '% of users!'
                 messaging({'message': msg, 'type': 'submission', 'name': user})
 
 @socketio.on('leaderboard')
