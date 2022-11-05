@@ -206,6 +206,11 @@ def start_room(data):
     # user_id = request.sid
     user = data['name']
     room_id = current_users[user]
+
+    if room_start[room_id]:
+        emit('error', {'message': 'Room already started!', 'type': 'error'})
+        return
+
     room_start[room_id] = True
     room_start_time[room_id] = time.time()
 
@@ -363,6 +368,11 @@ def restart(data):
     # user_id = request.sid
     user = data['name']
     room_id = current_users[user]
+
+    if not room_start[room_id]:
+        emit('error', {'message': 'Room already stopped!', 'type': 'error'})
+        return
+
     room_start[room_id] = False
 
     messaging({'message': 'Room stopped 🛑! Waiting for the room moderator to start ⌛...', 'type': 'start', 'name': user})
