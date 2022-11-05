@@ -270,7 +270,7 @@ def start_room(data):
         contest_time = easy * 15 * 60 + med * 30 * 60 + hard * 60 * 60
 
         # test
-        contest_time = 10
+        # contest_time = 10
 
         print('\n===CONTEST TIME===')
         print(contest_time)
