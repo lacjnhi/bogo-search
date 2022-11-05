@@ -6,6 +6,7 @@ from collections import defaultdict, deque
 import requests, json, random
 import time
 from math import floor
+from heapq import heappush, heappop
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'test'
@@ -37,7 +38,7 @@ user_question_status = defaultdict(lambda: defaultdict(list)) # key: roomid valu
 
 number_of_questions = defaultdict(int) # key: roomid value: number of questions
 
-timer_order = deque()
+timer_order = []
 def background_thread():
     print("===TIMER STARTED!===")
     while True:
@@ -46,7 +47,7 @@ def background_thread():
 
         print('===TIMER TEST===', t, timer_order)
         while timer_order and t >= timer_order[0][0]:
-            timer, room_id = timer_order.popleft()
+            timer, room_id = heappop(timer_order)
 
             if timer != room_end_time[room_id] or not room_start[room_id]:
                 continue
@@ -287,7 +288,7 @@ def start_room(data):
     print(user_question_status[room_id])
 
     room_end_time[room_id] = room_start_time[room_id] + room_timer[room_id]
-    timer_order.append((room_end_time[room_id], room_id))
+    heappush(timer_order, (room_end_time[room_id], room_id))
     players = rooms[room_id]
     questions = room_questions[room_id]
     emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name, 'is_owner': True, 'timer': room_timer[room_id], 'is_started': True})
