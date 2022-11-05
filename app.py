@@ -43,8 +43,7 @@ def background_thread():
         socketio.sleep(1)
         t = time.time()
 
-        print('\n===TIMER TEST===')
-        print(t, timer_order)
+        print('===TIMER TEST===', t, timer_order)
         while timer_order and t >= timer_order[0][0]:
             room_id = timer_order[0][1]
             timer_order.popleft()
@@ -276,9 +275,9 @@ def start_room(data):
                 for _ in range(number_of_questions[room_id]):
                     user_question_status[room_id][player].append([0,0])
 
-        print('\n===ROOM INFO - QUESTIONS AND STATUS===')
-        print(room_questions[room_id])
-        print(user_question_status[room_id])
+    print('\n===ROOM INFO - QUESTIONS AND STATUS===')
+    print(room_questions[room_id])
+    print(user_question_status[room_id])
 
     timer_order.append((room_timer[room_id] + time.time(), room_id))
     players = rooms[room_id]
