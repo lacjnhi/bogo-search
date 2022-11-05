@@ -49,7 +49,7 @@ def background_thread():
             room_id = timer_order[0][1]
             timer = timer_order[0][0]
 
-            if timer != room_end_time[room_id]:
+            if timer != room_end_time[room_id] or not room_start[room_id]:
                 continue
 
             timer_order.popleft()
