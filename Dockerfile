@@ -10,7 +10,7 @@ RUN python -m pip install --upgrade pip
 RUN pip install -r /requirements.txt
 COPY . /
 WORKDIR /
-ENV PORT 5000
+ENV PORT 5001
 ENV PYTHONUNBUFFERED 1
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--worker-class", "eventlet", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5001", "--workers", "1", "--worker-class", "eventlet", "app:app"]
 
