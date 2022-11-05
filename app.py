@@ -256,7 +256,6 @@ def start_room(data):
         room_timer[room_id] = contest_time
 
         user_question_status[room_id][user] = []
-        user_scores[room_id][user] = 0
         room_questions[room_id] = []
         number_of_questions[room_id] = len(prechosen_questions)
 
@@ -268,11 +267,10 @@ def start_room(data):
         
         # add question status
         for player in rooms[room_id]:
-            if player in user_scores[room_id]:
-                user_scores[room_id][player] = 0
-                user_question_status[room_id][player] = []
-                for _ in range(number_of_questions[room_id]):
-                    user_question_status[room_id][player].append([0,0])
+            user_scores[room_id][player] = 0
+            user_question_status[room_id][player] = []
+            for _ in range(number_of_questions[room_id]):
+                user_question_status[room_id][player].append([0,0])
 
     print('\n===ROOM INFO - QUESTIONS AND STATUS===')
     print(room_questions[room_id])
