@@ -46,13 +46,11 @@ def background_thread():
 
         print('===TIMER TEST===', t, timer_order)
         while timer_order and t >= timer_order[0][0]:
-            room_id = timer_order[0][1]
-            timer = timer_order[0][0]
+            room_id, timer = timer_order.popleft()
 
             if timer != room_end_time[room_id] or not room_start[room_id]:
                 continue
 
-            timer_order.popleft()
             if room_id in rooms:
                 room_start[room_id] = False
                 socketio.emit('message', {'message': 'Timer ended 🛑! Waiting for the room moderator to start ⌛...', 'type': 'start', 'time': t}, room=room_id)
