@@ -153,6 +153,19 @@ def create_room(data):
     }
     print(room_question_topics_and_difficulty[room_id])
 
+    # generate questions beforehand and check if it is valid choice
+    questions_generator(easy, med, hard, topics, problem_set, user)
+    print(number_of_questions[room_id])
+    if not number_of_questions[room_id]:
+        print('\n===EMIT ERROR MESSAGE===')
+        emit('error', {'message': 'No questions matched preferences!', 'type': 'error'})
+        return
+    else:
+        number_of_questions[room_id] = []
+        user_question_status[room_id][user] = []
+        user_scores[room_id][user] = 0
+        room_questions[room_id] = []
+
     players = rooms[room_id]
     emit('room_info', {'room_id': room_id, 'players': players, 'room_name': room_name, 'is_owner': True, 'questions': []})
     emit('leaderboard', {'room_id': room_id, 'rankings': [], 'question_status': []})
@@ -364,8 +377,9 @@ def questions_generator(easy, med, hard, topics, problem_set, user):
 
             number_of_questions[room_id] = len(easy_question_numbers) + len(med_question_numbers) + len(hard_question_numbers)
 
+            print('\n===NUMBER OF QUESIONS - BLIND75 or NEETCODE 150===')
+            print(number_of_questions[room_id])
             if number_of_questions[room_id] == 0:
-                emit({'message': 'No questions matched preferences!', 'type': 'error'})
                 return 
 
             for question_id in easy_question_numbers:
@@ -399,8 +413,10 @@ def questions_generator(easy, med, hard, topics, problem_set, user):
 
             number_of_questions[room_id] = len(easy_question_numbers) + len(med_question_numbers) + len(hard_question_numbers)
 
+            print('\n===NUMBER OF QUESIONS - NO PROBLEMSET===')
+            print(number_of_questions[room_id])
+
             if number_of_questions[room_id] == 0:
-                emit({'message': 'Please choose more than 0 questions to get started!', 'type': 'error'})
                 return 
 
             for question_id in easy_question_numbers:
@@ -434,7 +450,6 @@ def questions_generator(easy, med, hard, topics, problem_set, user):
 
         number_of_questions[room_id] = len(easy_question_numbers) + len(med_question_numbers) + len(hard_question_numbers)
         if number_of_questions[room_id] == 0:
-            emit({'message': 'No questions matched your preferences.', 'type': 'error'})
             return 
 
         for question_id in easy_question_numbers:
@@ -498,8 +513,11 @@ def questions_generator(easy, med, hard, topics, problem_set, user):
         print('\n')
 
         number_of_questions[room_id] = len(easy_question_numbers) + len(med_question_numbers) + len(hard_question_numbers)
+
+        print('\n===NUMBER OF QUESIONS - MULTIPLE TOPICS===')
+        print(number_of_questions[room_id])
+
         if number_of_questions[room_id] == 0:
-            emit({'message': 'No questions matched your preferences.', 'type': 'error'})
             return 
 
         for question_id in easy_question_numbers:
@@ -656,7 +674,7 @@ def leave(data):
 
     if user not in current_users:
         print('User not in any room!')
-        emit({'message': 'You are not in a room', 'type': 'error'})
+        emit('error', {'message': 'You are not in a room', 'type': 'error'})
         return
 
     room_id = current_users[user]
