@@ -30,7 +30,7 @@ room_end_time = defaultdict(int)    # key: room id, end time
 
 room_number = 0
 
-user_scores = defaultdict(lambda: defaultdict(int)) # key: room_id value: {key: user value: score} 
+user_scores = defaultdict(lambda: defaultdict(list)) # key: room_id value: {key: user value: score} 
 user_question_status = defaultdict(lambda: defaultdict(list)) # key: roomid value: {key: username value: status 0/1/2}
 # 0: not started
 # 1: started but unsuccessful
@@ -175,7 +175,7 @@ def create_room(data):
         return
     else:
         user_question_status[room_id][user] = []
-        user_scores[room_id][user] = 0
+        user_scores[room_id][user] = [0, float('inf')]
         room_questions[room_id] = []
 
     players = rooms[room_id]
@@ -285,12 +285,16 @@ def start_room(data):
         for i in range(number_of_questions[room_id]):
             # title, links, difficulty
             room_questions[room_id].append((question_details[i][2], question_details[i][0], question_details[i][1]))
+    
+
+    room_end_time[room_id] = room_start_time[room_id] + room_timer[room_id]
+    heappush(timer_order, (room_end_time[room_id], room_id))
         
     # add question status
     print(rooms[room_id])
     for player in rooms[room_id]:
         print(player)
-        user_scores[room_id][player] = 0
+        user_scores[room_id][player] = [0, room_end_time[room_id]]
         user_question_status[room_id][player] = []
         for _ in range(number_of_questions[room_id]):
             user_question_status[room_id][player].append([0,0])
@@ -299,9 +303,6 @@ def start_room(data):
     print('\n===ROOM INFO - QUESTIONS AND STATUS===')
     print(room_questions[room_id])
     print(user_question_status[room_id])
-
-    room_end_time[room_id] = room_start_time[room_id] + room_timer[room_id]
-    heappush(timer_order, (room_end_time[room_id], room_id))
 
     if not thread:
         thread = socketio.start_background_task(background_thread)
@@ -359,7 +360,7 @@ def join(data):
             print("New user join room " + room_name + ". The users now are: ", rooms[room_id])
             print(rooms)
 
-            user_scores[room_id][user] = 0
+            user_scores[room_id][user] = [0, float('inf')]
 
         if len(rooms[room_id]) == 1:
             room_owner[room_id] = user
@@ -367,7 +368,7 @@ def join(data):
 
         # check if room is started
         if room_start[room_id]:
-            user_scores[room_id][user] = 0
+            user_scores[room_id][user] = [0, room_end_time[room_id]]
             user_question_status[room_id][user] = []
             for _ in range(number_of_questions[room_id]):
                 user_question_status[room_id][user].append([0,0])
@@ -576,7 +577,7 @@ def questions_generator(easy, med, hard, topics, problem_set, user):
             question_title.append(algorithms_problems_json[question_id]["title"])
 
     user_question_status[room_id][user] = []
-    user_scores[room_id][user] = 0
+    user_scores[room_id][user] = [0, float('inf')]
     room_questions[room_id] = []
     number_of_questions[room_id] = len(list_of_question_links)
 
@@ -783,19 +784,6 @@ def leave(data):
         print(room_owner)
 
     del current_users[user]
-
-    # if user in user_scores[room_id]:
-    #     del user_scores[room_id][user]
-    # if user in user_question_status[room_id]:
-    #     del user_question_status[room_id][user]
-
-    # if room_id in user_question_status and user in user_question_status[room_id]:
-    #     del user_question_status[room_id][user]
-
-    # if room_id in user_scores and user in user_scores[room_id]:
-    #     del user_scores[room_id][user]
-
-    # socketio.server.leave_room(user_id, room_id)
     leave_room(room_id)
 
     print('\n===ROOM LIST AFTER SOMEONE LEFT THE ROOM===')
@@ -862,13 +850,14 @@ def send_submission(data):
 
                 msg = user + ' completed problem ' + str(id+1) + ' in ' + language + ', beat ' + str(round(percentile, 2)) + '% of users!'
                 messaging({'message': msg, 'type': 'submission', 'name': user})
-                user_scores[room_id][user] += difficulty
+                user_scores[room_id][user][0] += difficulty
 
                 # user successfully solved every problems
                 status = [s[0] for s in user_question_status[room_id][user]]
 
                 if len(set(status)) == 1 and list(set(status))[0] == 2:
                     msg = user + ' finished the contest!'
+                    user_scores[room_id][user][1] = min(time.time(), user_scores[room_id][user][1])
                     messaging({'message': msg, 'type': 'submission', 'name': user})
             else:
                 msg = user + ' resubmitted and completed problem ' + str(id+1) + ' in ' + language + ', beat ' + str(round(percentile, 2)) + '% of users!'
@@ -884,7 +873,7 @@ def get_rankings(data):
         room_id = current_users[user]
 
         rankings = user_scores[room_id]
-        rankings = sorted(rankings.items(), key=lambda i: i[1], reverse=True)
+        rankings = sorted(rankings.items(), key=lambda i: (-i[1], i[2]))
 
         print('Room ' + room_id + ' current rankings:')
         for i, value in enumerate(rankings):
