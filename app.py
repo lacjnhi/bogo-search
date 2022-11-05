@@ -338,6 +338,15 @@ def join(data):
         if len(rooms[room_id]) == 1:
             room_owner[room_id] = user
             emit('room_info', {'is_owner': True})
+
+        # check if room is started
+        if room_start[room_id]:
+            user_scores[room_id][user] = 0
+            user_question_status[room_id][user] = []
+            for _ in range(number_of_questions[room_id]):
+                user_question_status[room_id][user].append([0,0])
+                print('\n===USER JOINED AND ROOM ALREADY STARTED, ADD STATUS===')
+                print(user_question_status)
             
 
 @socketio.on('restart')
