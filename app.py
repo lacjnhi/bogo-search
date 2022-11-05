@@ -40,8 +40,9 @@ number_of_questions = defaultdict(int) # key: roomid value: number of questions
 
 timer_order = []
 def background_thread():
+    global thread
     print("===TIMER STARTED!===")
-    while True:
+    while timer_order:
         socketio.sleep(1)
         t = time.time()
 
@@ -55,6 +56,8 @@ def background_thread():
             if room_id in rooms:
                 room_start[room_id] = False
                 socketio.emit('message', {'message': 'Timer ended 🛑! Waiting for the room moderator to start ⌛...', 'type': 'start', 'time': t}, room=room_id)
+    
+    thread = None
 
 @app.route('/')
 def index():
@@ -184,11 +187,7 @@ def create_room(data):
 @socketio.on('retrieve_room_info')
 def retrieve_room_info(data):
     # user_id = request.sid
-    global thread
     user = data['name']
-
-    if not thread:
-        thread = socketio.start_background_task(background_thread)
 
     if user in current_users:
         room_id = current_users[user]
@@ -203,6 +202,8 @@ def retrieve_room_info(data):
 
 @socketio.on('ready')
 def start_room(data):
+    global thread 
+
     # user_id = request.sid
     user = data['name']
     room_id = current_users[user]
@@ -265,7 +266,7 @@ def start_room(data):
 
         # test
         # contest_time = 10
-        
+
         print('\n===CONTEST TIME===')
         print(contest_time)
         room_timer[room_id] = contest_time
@@ -296,6 +297,10 @@ def start_room(data):
 
     room_end_time[room_id] = room_start_time[room_id] + room_timer[room_id]
     heappush(timer_order, (room_end_time[room_id], room_id))
+
+    if not thread:
+        thread = socketio.start_background_task(background_thread)
+
     players = rooms[room_id]
     questions = room_questions[room_id]
     emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name, 'is_owner': True, 'timer': room_timer[room_id], 'is_started': True})
