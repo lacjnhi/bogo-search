@@ -47,10 +47,10 @@ def background_thread():
         t = time.time()
 
         print('===TIMER TEST===', t, timer_order)
-        while timer_order and t >= timer_order[0][0]:
+        while timer_order and (t >= timer_order[0][0] or timer_order[0][1] not in rooms):
             timer, room_id = heappop(timer_order)
 
-            if timer != room_end_time[room_id] or not room_start[room_id]:
+            if room_id not in rooms or timer != room_end_time[room_id] or not room_start[room_id]:
                 continue
 
             if room_id in rooms:
