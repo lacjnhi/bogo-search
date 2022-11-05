@@ -47,8 +47,9 @@ def background_thread():
         while timer_order and t >= timer_order[0][0]:
             room_id = timer_order[0][1]
             timer_order.popleft()
-            room_start[room_id] = False
-            socketio.emit('message', {'message': 'Timer ended 🛑! Waiting for the room moderator to start ⌛...', 'type': 'start', 'time': t}, room=room_id)
+            if room_id in rooms:
+                room_start[room_id] = False
+                socketio.emit('message', {'message': 'Timer ended 🛑! Waiting for the room moderator to start ⌛...', 'type': 'start', 'time': t}, room=room_id)
 
 @app.route('/')
 def index():
