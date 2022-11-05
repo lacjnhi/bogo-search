@@ -879,10 +879,18 @@ def get_rankings(data):
         for i, value in enumerate(rankings):
             print(str(i+1) + '. ' + value[0] + ' with the score of ' + str(value[1]))
 
+        print('\n===RANKINGS WITH ALL VALUES===')
+        print(rankings)
+
+        tmp_ranking_list = []
+        for user, score_time in rankings:
+            score, _ = score_time
+            tmp_ranking_list.append([user, score])
+
         print('\n===RANKINGS===')
         print(rankings)
         print(user_question_status[room_id])
-        emit('leaderboard', {'room_id': room_id, 'rankings': rankings, 'question_status': user_question_status[room_id]})
+        emit('leaderboard', {'room_id': room_id, 'rankings': tmp_ranking_list, 'question_status': user_question_status[room_id]})
 
 
 if __name__ == '__main__':
