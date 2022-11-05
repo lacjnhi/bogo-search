@@ -44,7 +44,7 @@ def background_thread():
         socketio.sleep(1)
         t = time.time()
 
-        print('===TIMER TEST===', t, timer_order, room_end_time[room_id])
+        print('===TIMER TEST===', t, timer_order)
         while timer_order and t >= timer_order[0][0]:
             timer, room_id = timer_order.popleft()
 
