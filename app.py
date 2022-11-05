@@ -155,12 +155,11 @@ def create_room(data):
 
     # generate questions beforehand and check if it is valid choice
     questions_generator(easy, med, hard, topics, problem_set, user)
-    if not number_of_questions[room_id]:
+    if number_of_questions[room_id] == 0:
         print('\n===EMIT ERROR MESSAGE===')
         emit('error', {'message': 'No questions matched preferences!', 'type': 'error'})
         return
     else:
-        number_of_questions[room_id] = []
         user_question_status[room_id][user] = []
         user_scores[room_id][user] = 0
         room_questions[room_id] = []
@@ -333,13 +332,7 @@ def join(data):
             print("New user join room " + room_name + ". The users now are: ", rooms[room_id])
             print(rooms)
 
-            # add question status
-            if user not in user_scores[room_id]:
-                user_scores[room_id][user] = 0
-                for _ in range(number_of_questions[room_id]):
-                    user_question_status[room_id][user].append([0,0])
-                print('\n===NEW USER QUESTION STATUS===')
-                print(user_question_status)
+            user_scores[room_id][user] = 0
 
         if len(rooms[room_id]) == 1:
             room_owner[room_id] = user
