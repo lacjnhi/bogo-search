@@ -265,12 +265,15 @@ def start_room(data):
             # title, links, difficulty
             room_questions[room_id].append((question_details[i][2], question_details[i][0], question_details[i][1]))
         
-        # add question status
-        for player in rooms[room_id]:
-            user_scores[room_id][player] = 0
-            user_question_status[room_id][player] = []
-            for _ in range(number_of_questions[room_id]):
-                user_question_status[room_id][player].append([0,0])
+    # add question status
+    print(rooms[room_id])
+    for player in rooms[room_id]:
+        print(player)
+        user_scores[room_id][player] = 0
+        user_question_status[room_id][player] = []
+        for _ in range(number_of_questions[room_id]):
+            user_question_status[room_id][player].append([0,0])
+            print(user_question_status)
 
     print('\n===ROOM INFO - QUESTIONS AND STATUS===')
     print(room_questions[room_id])
@@ -546,11 +549,9 @@ def questions_generator(easy, med, hard, topics, problem_set, user):
     for i in range(number_of_questions[room_id]):
         # (title, links, difficulty)
         room_questions[room_id].append((question_title[i], list_of_question_links[i][0], list_of_question_links[i][1]))
-        user_question_status[room_id][user].append([0,0])
 
-    print('\n===ROOM QUESTIONS AND USER STATUSES===')
+    print('\n===ROOM QUESTIONS===')
     print(room_questions[room_id])
-    print(user_question_status[room_id])
 
 def generate_questions_no_topics(count, level, type):
     questions_id = []
