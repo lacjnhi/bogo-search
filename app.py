@@ -25,6 +25,7 @@ room_question_topics_and_difficulty = defaultdict(object) # key: roomid, value: 
 room_start = defaultdict(bool)      # key: room id, start yet or not
 room_timer = defaultdict(int)       # key: room id, timer
 room_start_time = defaultdict(int)  # key: room id, start time
+room_end_time = defaultdict(int)    # key: room id, end time
 
 room_number = 0
 
@@ -46,6 +47,11 @@ def background_thread():
         print('===TIMER TEST===', t, timer_order)
         while timer_order and t >= timer_order[0][0]:
             room_id = timer_order[0][1]
+            timer = timer_order[0][0]
+
+            if timer != room_end_time[room_id]:
+                continue
+
             timer_order.popleft()
             if room_id in rooms:
                 room_start[room_id] = False
@@ -252,6 +258,8 @@ def start_room(data):
 
         # calculate time needed based on the number of difficulties
         contest_time = easy * 15 * 60 + med * 30 * 60 + hard * 60 * 60
+        # test
+        contest_time = 10
         print('\n===CONTEST TIME===')
         print(contest_time)
         room_timer[room_id] = contest_time
@@ -280,7 +288,8 @@ def start_room(data):
     print(room_questions[room_id])
     print(user_question_status[room_id])
 
-    timer_order.append((room_timer[room_id] + time.time(), room_id))
+    room_end_time[room_id] = room_start_time[room_id] + room_timer[room_id]
+    timer_order.append((room_end_time[room_id], room_id))
     players = rooms[room_id]
     questions = room_questions[room_id]
     emit('room_info', {'room_id': room_id, 'players': players, 'questions': questions, 'room_name': room_name, 'is_owner': True, 'timer': room_timer[room_id], 'is_started': True})
@@ -716,6 +725,8 @@ def leave(data):
             del room_timer[room_id]
         if room_id in room_start_time:
             del room_start_time[room_id]
+        if room_id in room_end_time[room_id]:
+            del room_end_time[room_id]
 
         if room_id in room_question_topics_and_difficulty:
             del room_question_topics_and_difficulty[room_id]
