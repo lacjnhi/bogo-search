@@ -56,6 +56,7 @@ def background_thread():
             if room_id in rooms:
                 room_start[room_id] = False
                 socketio.emit('message', {'message': 'Timer ended 🛑! Waiting for the room moderator to start ⌛...', 'type': 'start', 'time': t}, room=room_id)
+                chat_logs[room_id].append('Timer ended 🛑! Waiting for the room moderator to start ⌛...')
     
     thread = None
 
