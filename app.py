@@ -151,11 +151,11 @@ def create_room(data):
         'topics': topics,
         'questions': prechosen_questions
     }
+    print('\n===ROOM ' + room_name + ' DETAILS===')
     print(room_question_topics_and_difficulty[room_id])
 
     # generate questions beforehand and check if it is valid choice
     questions_generator(easy, med, hard, topics, problem_set, user)
-    print(number_of_questions[room_id])
     if not number_of_questions[room_id]:
         print('\n===EMIT ERROR MESSAGE===')
         emit('error', {'message': 'No questions matched preferences!', 'type': 'error'})
@@ -172,6 +172,7 @@ def create_room(data):
     # socketio.server.enter_room(user_id, room_id)
     join_room(room_id)
 
+    print('\n===ROOM ' + room_name + ' IS CREATED===')
     print("A new room is successfully created!\nThe list of rooms: ", rooms)
     messaging({'message': data['name'] + ' just joined the room!', 'type': 'admin', 'name': user})
     messaging({'message': 'Hey ' + data['name'] + '👋, round has not started yet! You can start anytime by clicking the "start" button!', 'type': 'start', 'name': user})
@@ -305,7 +306,6 @@ def join(data):
         rooms[room_id] = list(set(rooms[room_id]))
 
         if user in current_users and current_users[user] != room_id:
-            print('test')
             leave({'name': user})
         
         if user not in current_users:
@@ -330,6 +330,7 @@ def join(data):
             emit('room_info', {'players': players, 'timer': max(0, floor(room_timer[room_id] + room_start_time[room_id] - time.time()))}, room=room_id)
             emit('leaderboard', {'room_id': room_id, 'rankings': [], 'question_status': []})
 
+            print('\n===NEW USER JOIN ROOM: ' + user + ' join room ' + room_name + '===')
             print("New user join room " + room_name + ". The users now are: ", rooms[room_id])
             print(rooms)
 
@@ -338,6 +339,7 @@ def join(data):
                 user_scores[room_id][user] = 0
                 for _ in range(number_of_questions[room_id]):
                     user_question_status[room_id][user].append([0,0])
+                print('\n===NEW USER QUESTION STATUS===')
                 print(user_question_status)
 
         if len(rooms[room_id]) == 1:
@@ -506,11 +508,11 @@ def questions_generator(easy, med, hard, topics, problem_set, user):
         for k, v in hard_problems.items():
             hard_question_numbers.extend(generate_questions(k, v, problem_set))
 
-        print('\n')
-        print(easy_question_numbers)
-        print(med_question_numbers)
-        print(hard_question_numbers)
-        print('\n')
+        # print('\n')
+        # print(easy_question_numbers)
+        # print(med_question_numbers)
+        # print(hard_question_numbers)
+        # print('\n')
 
         number_of_questions[room_id] = len(easy_question_numbers) + len(med_question_numbers) + len(hard_question_numbers)
 
@@ -556,6 +558,7 @@ def questions_generator(easy, med, hard, topics, problem_set, user):
         room_questions[room_id].append((question_title[i], list_of_question_links[i][0], list_of_question_links[i][1]))
         user_question_status[room_id][user].append([0,0])
 
+    print('\n===ROOM QUESTIONS AND USER STATUSES===')
     print(room_questions[room_id])
     print(user_question_status[room_id])
 
@@ -684,6 +687,7 @@ def leave(data):
         rooms[room_id].remove(user)
 
     if len(rooms[room_id]) == 0 and room_name_pairs1[room_id] != 'beta-test':
+        print('\n===ALL USERS LEAVE ROOM===')
         print("Room is terminated!")
 
         if room_id in chat_logs:
@@ -721,6 +725,7 @@ def leave(data):
 
     else:
         room_name = room_name_pairs1[room_id]
+        print('\n===USER DISCONNECTED===')
         print("User " + user + " disconnected from " + str(room_id) + ". The users in the current room " +  str(room_id) + " are: ")
 
         for i, user1 in enumerate(rooms[room_id]):
@@ -741,6 +746,7 @@ def leave(data):
         else:
             messaging({'message': user + ' just left the room!', 'type': 'admin', 'include_self': False, 'name': user})
 
+        print('\n===CURRENT OWNER OF ' + room_id + '===')
         print(room_owner)
 
     del current_users[user]
@@ -759,6 +765,7 @@ def leave(data):
     # socketio.server.leave_room(user_id, room_id)
     leave_room(room_id)
 
+    print('\n===ROOM LIST AFTER SOMEONE LEFT THE ROOM===')
     print(rooms)
 
 @socketio.on('message')
@@ -771,8 +778,6 @@ def messaging(data):
     # get current time
     cur_time = time.time()
 
-    print(msg)
-    print(user, current_users)
     # user_id = request.sid
     if user in current_users:
         room_id = current_users[user]
@@ -782,6 +787,7 @@ def messaging(data):
         tmp = {'message': msg, 'name': user, 'type': msg_type, 'room_name': room_name, 'time': cur_time}
         chat_logs[room_id].append(tmp)
 
+        print('\n===MESSSAGE RECEIVED===')
         print('Received message from ' + user + ': ' + msg + ' in room ' + room_name)
         emit('message', tmp, room=room_id, include_self=include_self)
 
@@ -840,15 +846,15 @@ def get_rankings(data):
     # return users, their question statuses and rankings
     # user_id = request.sid 
     user = data['name']
-    print(user, current_users)
+    print('\n===USER: ' + user + ' CLICKED LEADERBOARD===')
     if user in current_users:
         room_id = current_users[user]
 
         rankings = user_scores[room_id]
         rankings = sorted(rankings.items(), key=lambda i: i[1], reverse=True)
 
+        print('Room ' + room_id + ' current rankings:')
         for i, value in enumerate(rankings):
-            print('\nRoom ' + room_id + ' current rankings:')
             print(str(i+1) + '. ' + value[0] + ' with the score of ' + str(value[1]))
 
         print('\n===RANKINGS===')
