@@ -3,7 +3,7 @@ A Chrome Extension to create rooms on Leetcode to compete solving programming qu
 
 Check out https://github.com/sunnyguan/leetcode-rooms-chrome-extension for more info!
 
-# Latest Version: 0.3.4
+# Latest Version: 0.4.1
 
 # Instructions:
 Prerequisites:
