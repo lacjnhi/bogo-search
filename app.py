@@ -873,7 +873,7 @@ def get_rankings(data):
         room_id = current_users[user]
 
         rankings = user_scores[room_id]
-        rankings = sorted(rankings.items(), key=lambda i: (-i[1], i[2]))
+        rankings = sorted(rankings.items(), key=lambda i: (-i[1][0], i[1][1]))
 
         print('Room ' + room_id + ' current rankings:')
         for i, value in enumerate(rankings):
