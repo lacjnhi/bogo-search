@@ -725,7 +725,7 @@ def leave(data):
             del room_timer[room_id]
         if room_id in room_start_time:
             del room_start_time[room_id]
-        if room_id in room_end_time[room_id]:
+        if room_id in room_end_time:
             del room_end_time[room_id]
 
         if room_id in room_question_topics_and_difficulty:
