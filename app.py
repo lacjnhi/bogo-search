@@ -226,8 +226,10 @@ def start_room(data):
             to_delete.append(player)
     
     for p in to_delete:
-        del user_scores[room_id][p]
-        del user_question_status[room_id][p]
+        if p in user_scores[room_id]:
+            del user_scores[room_id][p]
+        if p in user_question_status[room_id]:
+            del user_question_status[room_id][p]
 
     prechosen_questions = room_question_topics_and_difficulty[room_id]["questions"]
     easy                = room_question_topics_and_difficulty[room_id]["easy"]
