@@ -68,6 +68,8 @@ def background_thread():
 def index():
     return render_template('index.html')
 
+banned = ['Concurrency', 'Database']
+
 file = open('data/lc_questions.json')
 algorithms_problems_json = json.load(file)
 algorithms_problems_json = algorithms_problems_json['data']['problemsetQuestionList']['questions']
@@ -216,6 +218,8 @@ def retrieve_room_info(data):
 @socketio.on('ready')
 def start_room(data):
     global thread 
+    global banned
+    global algorithms_problems_json
 
     # user_id = request.sid
     user = data['name']
@@ -246,6 +250,11 @@ def start_room(data):
     topics              = room_question_topics_and_difficulty[room_id]["topics"]
     problem_set         = room_question_topics_and_difficulty[room_id]["problemset"]
     room_name           = room_question_topics_and_difficulty[room_id]["room_name"]
+
+    print(('===SIZE OF QUESTION SET BEFORE CHECKING TOPICS: ', len(algorithms_problems_json)))
+    if 'Database' not in topics and 'Concurrency' not in topics:
+        algorithms_problems_json = [obj for obj in algorithms_problems_json if not any([tag['name'] in banned for tag in obj['topicTags']])]
+    print(('===SIZE OF QUESTION SET AFTER CHECKING TOPICS: ', len(algorithms_problems_json)))
 
     if not prechosen_questions:
         questions_generator(easy, med, hard, topics, problem_set, user)
