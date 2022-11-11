@@ -74,6 +74,7 @@ file = open('data/lc_questions.json')
 algorithms_problems_json = json.load(file)
 algorithms_problems_json = algorithms_problems_json['data']['problemsetQuestionList']['questions']
 algorithms_problems_json = [obj for obj in algorithms_problems_json if not obj['paidOnly']]
+deep_copy = algorithms_problems_json[:]
 file.close()
 
 file = open('data/title_to_id.json')
@@ -251,10 +252,12 @@ def start_room(data):
     problem_set         = room_question_topics_and_difficulty[room_id]["problemset"]
     room_name           = room_question_topics_and_difficulty[room_id]["room_name"]
 
-    print(('===SIZE OF QUESTION SET BEFORE CHECKING TOPICS: ', len(algorithms_problems_json)))
+    print(('\n===SIZE OF QUESTION SET BEFORE CHECKING TOPICS: ', len(algorithms_problems_json)))
     if 'Database' not in topics and 'Concurrency' not in topics:
         algorithms_problems_json = [obj for obj in algorithms_problems_json if not any([tag['name'] in banned for tag in obj['topicTags']])]
-    print(('===SIZE OF QUESTION SET AFTER CHECKING TOPICS: ', len(algorithms_problems_json)))
+    else:
+        algorithms_problems_json = deep_copy[:]
+    print(('\n===SIZE OF QUESTION SET AFTER CHECKING TOPICS: ', len(algorithms_problems_json)))
 
     if not prechosen_questions:
         questions_generator(easy, med, hard, topics, problem_set, user)
