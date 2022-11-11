@@ -125,13 +125,21 @@ file.close()
 # LEETCODE_URL = "https://leetcode.com/api/problems/algorithms/"
 @socketio.on('create_room')
 def create_room(data):
+
     # Add user in a room
     # user_id = request.sid
     room_name = data['room_name']
     easy, med, hard = data['difficulties']
     user = data['name']
 
+    if not user:
+        emit('error', {'message': 'You are not logged in!', 'type': 'error'})
+        print('\n===USER NOT LOGGED IN===')
+        return
+
     if room_name in room_name_pairs2:
+        emit('error', {'message': 'Room name already exists!', 'type': 'error'})
+        print('\n===ROOM ALREADY EXISTS' + room_name + ' ===')
         return
 
     if user in current_users:
@@ -328,6 +336,11 @@ def join(data):
         room_name = room_name_pairs1[room_id]
 
     user = data['name']
+
+    if not user:
+        emit('error', {'message': 'You are not logged in!', 'type': 'error'})
+        print('\n===USER NOT LOGGED IN===')
+        return
 
     if room_id in rooms:
         rooms[room_id].append(user)
