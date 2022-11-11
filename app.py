@@ -68,7 +68,7 @@ def background_thread():
 def index():
     return render_template('index.html')
 
-banned = ['Concurrency', 'Database']
+banned = ['Concurrency', 'Database', 'Shell']
 
 file = open('data/lc_questions.json')
 algorithms_problems_json = json.load(file)
@@ -253,7 +253,7 @@ def start_room(data):
     room_name           = room_question_topics_and_difficulty[room_id]["room_name"]
 
     print(('\n===SIZE OF QUESTION SET BEFORE CHECKING TOPICS: ', len(algorithms_problems_json)))
-    if 'Database' not in topics and 'Concurrency' not in topics:
+    if all([not banned_topic in topics for banned_topic in banned]):
         algorithms_problems_json = [obj for obj in algorithms_problems_json if not any([tag['name'] in banned for tag in obj['topicTags']])]
     else:
         algorithms_problems_json = deep_copy[:]
